@@ -1,0 +1,32 @@
+.ai-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+  padding: 2px 0;
+}
+
+.ai-progress-status {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ai-progress-bar-container {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  height: 4px;
+  overflow: hidden;
+}
+
+.ai-progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--interactive-accent);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.ai-progress-elapsed {
+  font-size: 12px;
+  opacity: 0.6;
+}

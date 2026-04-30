@@ -1,0 +1,9 @@
+{
+	"id": "ai-assistant",
+	"name": "AI Assistant",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Use Copilot, Claude, Gemini, or a local CLI tool to generate AI results directly inside the current note.",
+	"author": "Ivan Batura",
+	"isDesktopOnly": true
+}
