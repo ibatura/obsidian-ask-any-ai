@@ -26,3 +26,5 @@ data.json
 .npmrc
 .sdd/
 .claude/
+
+package-lock.json
