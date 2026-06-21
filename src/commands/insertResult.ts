@@ -3,45 +3,11 @@ import { AiAssistantSettings } from "../settings";
 import { resolveInlinePrompt } from "../core/promptResolver";
 import { expandObsidianLinks } from "../core/linkResolver";
 import { buildNoteNamesBlock } from "../core/noteNamesContext";
+import { validateProviderSettings } from "../core/providerValidation";
+import { parseTemplateOverrides, applyOverrides, stripFrontmatter } from "../core/templateOverrides";
 import { createLlmClient } from "../core/llmClient";
 import { PromptPickerModal } from "../ui/promptPickerModal";
 import { showProgressIndicator } from "../ui/progressIndicator";
-
-function isValidHttpUrl(s: string): boolean {
-  if (!s) return false;
-  try {
-    const u = new URL(s);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function validateProviderSettings(settings: AiAssistantSettings): string | null {
-  switch (settings.llmProvider) {
-    case "copilot":
-      if (!isValidHttpUrl(settings.copilotApiBaseUrl)) return "Set a valid Copilot API base URL in plugin settings";
-      if (!settings.copilotApiKey) return "Set a Copilot API key in plugin settings";
-      return null;
-    case "claude":
-      if (settings.claudeApiBaseUrl && !isValidHttpUrl(settings.claudeApiBaseUrl)) return "Claude API base URL must be http(s)";
-      if (!settings.claudeApiKey) return "Set a Claude API key in plugin settings";
-      return null;
-    case "claude-proxy":
-      if (!isValidHttpUrl(settings.claudeProxyApiBaseUrl)) return "Set a valid Claude proxy API base URL in plugin settings";
-      if (!settings.claudeProxyApiKey) return "Set a Claude proxy API key in plugin settings";
-      return null;
-    case "gemini":
-      if (settings.geminiApiBaseUrl && !isValidHttpUrl(settings.geminiApiBaseUrl)) return "Gemini API base URL must be http(s)";
-      if (!settings.geminiApiKey) return "Set a Gemini API key in plugin settings";
-      return null;
-    case "cli":
-      if (!settings.cliCommand || !settings.cliCommand.trim()) return "Set a CLI command in plugin settings";
-      return null;
-    default:
-      return "Unknown AI provider";
-  }
-}
 
 function getRawInput(editor: Editor): string {
   const selection = editor.getSelection();
@@ -72,7 +38,7 @@ async function runRequest(
     let resolvedSystemPrompt = systemPrompt;
     if (settings.includeVaultNoteNames) {
       progress.updateStatus("Building note list...", 25);
-      const noteBlock = buildNoteNamesBlock(app, settings.vaultNoteNamesExclusions);
+      const noteBlock = buildNoteNamesBlock(app, settings.vaultNoteNamesExclusions, settings.includeNoteAliases);
       resolvedSystemPrompt = resolvedSystemPrompt ? `${resolvedSystemPrompt}\n\n${noteBlock}` : noteBlock;
     }
 
@@ -172,6 +138,10 @@ export async function insertLlmResultRaw(
  * "Ask AI with template" command — opens the prompt-file picker, uses the chosen
  * template as the primary system prompt, and optionally prepends the inline prompt
  * when `llmIncludeInlineSystemPrompt` is enabled.
+ *
+ * Template frontmatter (`ai-*` properties) is parsed and applied as per-run
+ * overrides; the frontmatter block itself is stripped before the body is sent
+ * to the model.
  */
 export async function insertLlmResultWithTemplate(
   editor: Editor,
@@ -197,11 +167,28 @@ export async function insertLlmResultWithTemplate(
     return;
   }
 
-  const inlinePrompt = resolveInlinePrompt(settings);
-  const templateContent = picked ? await app.vault.read(picked) : "";
+  // Parse template frontmatter overrides
+  const cache = picked ? app.metadataCache.getFileCache(picked) : null;
+  const { overrides, warnings: parseWarnings } = parseTemplateOverrides(cache?.frontmatter ?? null);
+  const { effective: effectiveSettings, warnings: applyWarnings } = applyOverrides(settings, overrides);
+  const allWarnings = [...parseWarnings, ...applyWarnings];
+
+  if (allWarnings.length > 0) {
+    new Notice(
+      `Template override warnings:\n${allWarnings.map((w) => `• ${w}`).join("\n")}`
+    );
+    console.warn("[ai-assistant] Template override warnings:", allWarnings);
+  }
+
+  // Read template and strip frontmatter
+  const rawContent = picked ? await app.vault.read(picked) : "";
+  const templateContent = stripFrontmatter(rawContent, cache?.frontmatterPosition ?? undefined);
+
+  // Build system prompt using effective settings
+  const inlinePrompt = resolveInlinePrompt(effectiveSettings);
   const systemPrompt = inlinePrompt
     ? `${inlinePrompt}\n\n${templateContent}`
     : templateContent;
 
-  await runRequest(editor, file, app, settings, rawInput, systemPrompt);
+  await runRequest(editor, file, app, effectiveSettings, rawInput, systemPrompt);
 }

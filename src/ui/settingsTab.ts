@@ -301,6 +301,18 @@ export class AiAssistantSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName("Include note aliases")
+      .setDesc("When enabled, each note's aliases (from its frontmatter) are listed alongside it in the note-names block. Only has an effect when vault note names are included.")
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.includeNoteAliases)
+          .onChange(async (value) => {
+            this.plugin.settings.includeNoteAliases = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
     if (this.plugin.settings.includeVaultNoteNames) {
       new Setting(containerEl)
         .setName("Excluded name patterns")

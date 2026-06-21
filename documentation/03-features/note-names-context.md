@@ -1,10 +1,10 @@
 # Note-names context
 
-`buildNoteNamesBlock` in [src/core/noteNamesContext.ts](../../src/core/noteNamesContext.ts) appends a list of vault note names to the system prompt so the LLM can emit resolvable wikilinks. It runs only when `settings.includeVaultNoteNames` is `true` ([insertResult.ts:99](../../src/commands/insertResult.ts:99)).
+`buildNoteNamesBlock` in [src/core/noteNamesContext.ts](../../src/core/noteNamesContext.ts) appends a list of vault note names to the system prompt so the LLM can emit resolvable wikilinks. It runs only when `settings.includeVaultNoteNames` is `true` ([insertResult.ts](../../src/commands/insertResult.ts)).
 
 ## What the block looks like
 
-[noteNamesContext.ts:67](../../src/core/noteNamesContext.ts:67)
+Without aliases (`includeNoteAliases: false`, the default):
 
 ```
 ## Vault notes available for linking
@@ -16,17 +16,27 @@ When your response mentions any of the notes listed below, wrap the reference as
 - ...
 ```
 
-The instruction text is fixed ([noteNamesContext.ts:3](../../src/core/noteNamesContext.ts:3)).
+With aliases enabled (`includeNoteAliases: true`):
+
+```
+## Vault notes available for linking
+
+When your response mentions any of the notes listed below, wrap the reference as an Obsidian wiki-link using double square brackets, e.g. [[Note Name]]. Notes with aliases in parentheses may also be referenced by any of those aliases. Do not invent links to notes that are not in this list.
+
+- Note A (aka: alias-one, alias-two)
+- Note B
+- ...
+```
+
+Notes without aliases are rendered identically in both modes.
 
 ## Algorithm
-
-[noteNamesContext.ts:42](../../src/core/noteNamesContext.ts:42)
 
 1. **Enumerate** — `app.vault.getMarkdownFiles()` returns every `.md` in the vault (no folder restriction; all top-level + nested).
 2. **Exclude** — filter out files whose basename or vault-relative path (without `.md`) matches any pattern in `vaultNoteNamesExclusions`.
 3. **Disambiguate** — count basename occurrences (case-insensitive). For any basename that appears in 2+ files, render the **full vault path** (without `.md`) instead of the basename. This guarantees every entry resolves uniquely when the LLM emits it as a wikilink.
 4. **Sort** — alphabetical, case-insensitive.
-5. **Render** — bullet list joined with `\n`, prepended by the heading and instruction.
+5. **Render** — bullet list joined with `\n`, prepended by the heading and instruction. When `includeNoteAliases` is `true`, aliases are appended inline (see below).
 
 ## Exclusion patterns
 
@@ -69,18 +79,38 @@ These suppress two common kinds of vault noise:
 - Notes created by Obsidian's "New note" with no title yet.
 - Files produced by clipboard-image plugins.
 
+## Note aliases
+
+When `settings.includeNoteAliases` is `true`, `buildNoteNamesBlock` reads `app.metadataCache.getFileCache(file)?.frontmatter?.aliases` for each file. Obsidian stores aliases as either a YAML array (`["a", "b"]`) or a single string (`"a"`). Both forms are normalised into a `string[]`; empty or whitespace-only entries are dropped.
+
+A note with aliases is rendered as:
+
+```
+- My Note (aka: alias-one, alias-two)
+```
+
+A note without aliases is rendered as before:
+
+```
+- My Note
+```
+
+The extended linking instruction is used when aliases are enabled, telling the LLM that alias names are also acceptable targets for wikilinks.
+
+Exclusion patterns are applied before alias lookup, so excluded notes are dropped regardless of their alias list.
+
 ## Where the block is appended
 
-[insertResult.ts:99](../../src/commands/insertResult.ts:99)
+[insertResult.ts](../../src/commands/insertResult.ts)
 
 ```ts
 if (settings.includeVaultNoteNames) {
-  const noteBlock = buildNoteNamesBlock(app, settings.vaultNoteNamesExclusions);
-  systemPrompt = systemPrompt ? `${systemPrompt}\n\n${noteBlock}` : noteBlock;
+  const noteBlock = buildNoteNamesBlock(app, settings.vaultNoteNamesExclusions, settings.includeNoteAliases);
+  resolvedSystemPrompt = resolvedSystemPrompt ? `${resolvedSystemPrompt}\n\n${noteBlock}` : noteBlock;
 }
 ```
 
-If the prompt was previously empty (e.g. mode is `none`, or picker returned `"None"`), the note block becomes the entire system prompt. Otherwise it is appended after a blank-line separator.
+If the prompt was previously empty (e.g. no inline prompt and picker returned `"None"`), the note block becomes the entire system prompt. Otherwise it is appended after a blank-line separator.
 
 ## Performance considerations
 

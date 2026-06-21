@@ -3,6 +3,9 @@ import { App, TFile } from "obsidian";
 const LINKING_INSTRUCTION =
   "When your response mentions any of the notes listed below, wrap the reference as an Obsidian wiki-link using double square brackets, e.g. [[Note Name]]. Do not invent links to notes that are not in this list.";
 
+const LINKING_INSTRUCTION_WITH_ALIASES =
+  "When your response mentions any of the notes listed below, wrap the reference as an Obsidian wiki-link using double square brackets, e.g. [[Note Name]]. Notes shown with aliases in parentheses may also be referenced by those aliases. Do not invent links to notes that are not in this list.";
+
 export function patternToRegex(pattern: string): RegExp {
   let regexStr = "";
   let i = 0;
@@ -39,7 +42,22 @@ export function matchesExclusionPattern(
   return false;
 }
 
-export function buildNoteNamesBlock(app: App, exclusions: string[]): string {
+function normalizeAliases(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((v): v is string => typeof v === "string")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+}
+
+export function buildNoteNamesBlock(app: App, exclusions: string[], includeAliases = false): string {
   const files: TFile[] = app.vault.getMarkdownFiles();
 
   const filtered = files.filter((f) => {
@@ -54,20 +72,32 @@ export function buildNoteNamesBlock(app: App, exclusions: string[]): string {
     basenameCounts.set(key, (basenameCounts.get(key) ?? 0) + 1);
   }
 
-  const names: string[] = filtered.map((f) =>
-    (basenameCounts.get(f.basename.toLowerCase()) ?? 1) > 1
-      ? f.path.replace(/\.md$/, "")
-      : f.basename
-  );
+  const entries: string[] = filtered.map((f) => {
+    const displayName =
+      (basenameCounts.get(f.basename.toLowerCase()) ?? 1) > 1
+        ? f.path.replace(/\.md$/, "")
+        : f.basename;
 
-  names.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    if (includeAliases) {
+      const rawAliases = app.metadataCache.getFileCache(f)?.frontmatter?.aliases;
+      const aliases = normalizeAliases(rawAliases);
+      if (aliases.length > 0) {
+        return `${displayName} (aka: ${aliases.join(", ")})`;
+      }
+    }
 
-  const listSection = names.map((n) => `- ${n}`).join("\n");
+    return displayName;
+  });
+
+  entries.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  const listSection = entries.map((n) => `- ${n}`).join("\n");
+  const linkingInstruction = includeAliases ? LINKING_INSTRUCTION_WITH_ALIASES : LINKING_INSTRUCTION;
 
   return [
     "## Vault notes available for linking",
     "",
-    LINKING_INSTRUCTION,
+    linkingInstruction,
     "",
     listSection,
   ].join("\n");

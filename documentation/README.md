@@ -28,8 +28,9 @@ It is intended to be **self-contained**: every architectural fact, design ration
 ### 03 — Features
 - [LLM providers](03-features/llm-providers.md) — Copilot, Claude, Claude-proxy, Gemini, CLI
 - [Link resolution](03-features/link-resolution.md) — wikilink expansion algorithm
-- [Prompt resolution](03-features/prompt-resolution.md) — none / inline / picker modes
-- [Note-names context](03-features/note-names-context.md) — vault enumeration, glob exclusions
+- [Prompt resolution](03-features/prompt-resolution.md) — inline prompt and picker modes
+- [Note-names context](03-features/note-names-context.md) — vault enumeration, glob exclusions, aliases
+- [Template overrides](03-features/template-overrides.md) — per-run `ai-*` frontmatter keys, warn-and-fall-back, effective-settings merge
 - [Progress indicator](03-features/progress-indicator.md) — controller, percentages, error states
 - [Debug mode](03-features/debug-mode.md) — inserting the request payload alongside the response
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { matchesExclusionPattern, patternToRegex, buildNoteNamesBlock } from "./noteNamesContext";
+import type { TFile } from "obsidian";
 
 // ── patternToRegex / matchesExclusionPattern ──────────────────────────────
 
@@ -63,12 +64,20 @@ describe("matchesExclusionPattern", () => {
 
 // ── buildNoteNamesBlock ───────────────────────────────────────────────────
 
-function makeMockApp(files: { path: string; basename: string }[]) {
+function makeMockApp(
+  files: { path: string; basename: string; aliases?: unknown }[]
+) {
+  const fileObjects = files.map((f) => ({ path: f.path, basename: f.basename }));
   return {
     vault: {
-      getMarkdownFiles: vi.fn().mockReturnValue(
-        files.map((f) => ({ path: f.path, basename: f.basename }))
-      ),
+      getMarkdownFiles: vi.fn().mockReturnValue(fileObjects),
+    },
+    metadataCache: {
+      getFileCache: vi.fn().mockImplementation((file: TFile) => {
+        const entry = files.find((f) => f.path === file.path);
+        if (!entry || entry.aliases === undefined) return {};
+        return { frontmatter: { aliases: entry.aliases } };
+      }),
     },
   };
 }
@@ -135,5 +144,75 @@ describe("buildNoteNamesBlock", () => {
     expect(block).toContain("## Vault notes available for linking");
     const listLines = block.split("\n").filter((l) => l.startsWith("- "));
     expect(listLines).toHaveLength(0);
+  });
+
+  it("output is byte-for-byte identical when includeAliases is false", () => {
+    const app = makeMockApp([
+      { path: "Note.md", basename: "Note", aliases: ["my-note"] },
+    ]);
+    const withoutFlag = buildNoteNamesBlock(app as any, []);
+    const withFalse = buildNoteNamesBlock(app as any, [], false);
+    expect(withFalse).toBe(withoutFlag);
+    expect(withFalse).not.toContain("aka:");
+  });
+});
+
+describe("buildNoteNamesBlock — aliases", () => {
+  it("appends aliases when includeAliases is true and note has a YAML-list alias", () => {
+    const app = makeMockApp([
+      { path: "Project Plan.md", basename: "Project Plan", aliases: ["roadmap", "q3-plan"] },
+    ]);
+    const block = buildNoteNamesBlock(app as any, [], true);
+    expect(block).toContain("- Project Plan (aka: roadmap, q3-plan)");
+  });
+
+  it("appends alias when note has a single-string alias", () => {
+    const app = makeMockApp([
+      { path: "Meeting Notes.md", basename: "Meeting Notes", aliases: "minutes" },
+    ]);
+    const block = buildNoteNamesBlock(app as any, [], true);
+    expect(block).toContain("- Meeting Notes (aka: minutes)");
+  });
+
+  it("renders notes without aliases unchanged", () => {
+    const app = makeMockApp([
+      { path: "Plain.md", basename: "Plain" },
+      { path: "Aliased.md", basename: "Aliased", aliases: ["alias-a"] },
+    ]);
+    const block = buildNoteNamesBlock(app as any, [], true);
+    expect(block).toContain("- Aliased (aka: alias-a)");
+    expect(block).toContain("- Plain");
+    expect(block).not.toContain("Plain (aka:");
+  });
+
+  it("uses extended linking instruction when aliases are enabled", () => {
+    const app = makeMockApp([{ path: "Note.md", basename: "Note", aliases: ["n"] }]);
+    const block = buildNoteNamesBlock(app as any, [], true);
+    expect(block).toContain("aliases in parentheses may also be referenced");
+  });
+
+  it("uses original linking instruction when aliases are disabled", () => {
+    const app = makeMockApp([{ path: "Note.md", basename: "Note" }]);
+    const block = buildNoteNamesBlock(app as any, [], false);
+    expect(block).toContain("Do not invent links to notes that are not in this list.");
+    expect(block).not.toContain("aliases in parentheses");
+  });
+
+  it("exclusions still apply when aliases are enabled", () => {
+    const app = makeMockApp([
+      { path: "Untitled.md", basename: "Untitled", aliases: ["draft"] },
+      { path: "Note.md", basename: "Note" },
+    ]);
+    const block = buildNoteNamesBlock(app as any, ["Untitled*"], true);
+    expect(block).not.toContain("Untitled");
+    expect(block).toContain("- Note");
+  });
+
+  it("trims and drops empty alias strings", () => {
+    const app = makeMockApp([
+      { path: "Note.md", basename: "Note", aliases: ["  ", "valid", ""] },
+    ]);
+    const block = buildNoteNamesBlock(app as any, [], true);
+    expect(block).toContain("- Note (aka: valid)");
   });
 });

@@ -1,73 +1,54 @@
 # Prompt resolution
 
-The plugin supports three system-prompt modes via the `llmPromptMode` setting. The dispatch happens in two places:
+The plugin provides two commands, each with its own system-prompt source.
 
-- [src/core/promptResolver.ts](../../src/core/promptResolver.ts) — for `none` and `inline` modes (called when the command runs in those modes)
-- [src/commands/insertResult.ts:92](../../src/commands/insertResult.ts:92) — for `picker` mode (resolved by the caller using the picked file)
+## Ask AI
 
-## The three modes
+[src/commands/insertResult.ts — `insertLlmResultRaw`](../../src/commands/insertResult.ts)
 
-| Mode | Behaviour | Source |
-|---|---|---|
-| `none` | Returns empty string — no system prompt at all | [promptResolver.ts:8](../../src/core/promptResolver.ts:8) |
-| `inline` | Returns `llmInlinePrompt` (or default) — but only if `llmIncludeInlineSystemPrompt` is `true` | [promptResolver.ts:10](../../src/core/promptResolver.ts:10) |
-| `picker` | Opens [PromptPickerModal](../../src/ui/promptPickerModal.ts) before progress UI; reads chosen `.md` file | [insertResult.ts:69](../../src/commands/insertResult.ts:69) |
+The system prompt comes entirely from the inline prompt setting. `resolveInlinePrompt` in [src/core/promptResolver.ts](../../src/core/promptResolver.ts) returns:
 
-## Inline-mode toggle
+- The `llmInlinePrompt` string (or the built-in default) when `llmIncludeInlineSystemPrompt` is `true`.
+- An empty string when `llmIncludeInlineSystemPrompt` is `false`.
 
-[promptResolver.ts:11](../../src/core/promptResolver.ts:11)
+The toggle lets a user keep their inline prompt configured but temporarily suppress it without clearing it.
 
-```ts
-case "inline":
-  if (settings.llmIncludeInlineSystemPrompt === false) return "";
-  return settings.llmInlinePrompt || defaultInline;
-```
+## Ask AI with template
 
-`llmIncludeInlineSystemPrompt` lets a user keep their inline prompt configured but temporarily *not* send it — useful when iterating on the user-content side of the request without changing settings.
+[src/commands/insertResult.ts — `insertLlmResultWithTemplate`](../../src/commands/insertResult.ts)
 
-## Picker mode
+### Step 1 — Picker
 
 [src/ui/promptPickerModal.ts](../../src/ui/promptPickerModal.ts) is a `SuggestModal<PromptItem>` listing:
 
-- A `"None"` item ([promptPickerModal.ts:25](../../src/ui/promptPickerModal.ts:25)) which resolves to `null` (no system prompt).
-- All `.md` files directly inside the configured `llmPromptsFolder` ([promptPickerModal.ts:27](../../src/ui/promptPickerModal.ts:27)) — the search is case-insensitive on the parent path and **non-recursive** (only direct children).
+- A `"None"` item which resolves to `null` (no template, empty system prompt).
+- All `.md` files directly inside `settings.llmPromptsFolder` — the search is case-insensitive and **non-recursive** (only direct children).
 
-`openAndAwait()` ([promptPickerModal.ts:19](../../src/ui/promptPickerModal.ts:19)) returns a `Promise<TFile | null | "cancelled">`.
+`openAndAwait()` returns a `Promise<TFile | null | "cancelled">`.
 
-### The selectSuggestion override
+#### The selectSuggestion override
 
-[promptPickerModal.ts:54](../../src/ui/promptPickerModal.ts:54)
+Obsidian's default `SuggestModal` fires `onClose` before `onChooseSuggestion`, which would resolve the promise to `"cancelled"` before the chosen file ever surfaces. The override resolves synchronously *before* `close()`, and a `chosen` flag prevents `onClose` from double-resolving.
 
-```ts
-selectSuggestion(item: PromptItem): void {
-  this.chosen = true;
-  this.resolve(item.file);
-  this.close();
-}
-```
+### Step 2 — Frontmatter overrides
 
-Obsidian's default `SuggestModal` orchestration runs `onChooseSuggestion` and `onClose` in an order that the modal cannot influence. Without this override, `onClose` fires *first* and resolves the promise to `"cancelled"` before the chosen file ever surfaces.
+The template file's frontmatter is read via `app.metadataCache.getFileCache(picked)?.frontmatter`. Any `ai-*` keys found there are parsed and validated by `parseTemplateOverrides` and merged into a per-run clone of the global settings by `applyOverrides`. The global settings object is never mutated. See [Template overrides](template-overrides.md) for the full key table and fallback rules.
 
-By overriding `selectSuggestion` and resolving synchronously *before* `close()`, the chosen file always reaches the caller. The `chosen` flag prevents `onClose` from also calling `resolve("cancelled")` afterwards.
+### Step 3 — Frontmatter stripping
 
-## Picker resolution back in the pipeline
+The raw file content is read via `app.vault.read(picked)`. `stripFrontmatter` slices off everything up to and including the closing `---` line (using `frontmatterPosition.end.offset` from the metadata cache), then drops the leading newline. The result is the template *body* — the part that becomes the system prompt.
 
-[insertResult.ts:92](../../src/commands/insertResult.ts:92)
+### Step 4 — System prompt assembly
 
 ```ts
-if (settings.llmPromptMode === "picker") {
-  systemPrompt = pickedPromptFile ? await app.vault.read(pickedPromptFile) : "";
-} else {
-  systemPrompt = await resolveLlmPrompt(app, settings);
-}
+const inlinePrompt = resolveInlinePrompt(effectiveSettings);
+const systemPrompt = inlinePrompt
+  ? `${inlinePrompt}\n\n${templateBody}`
+  : templateBody;
 ```
 
-So when the user picks `"None"` (or no file is selected), `systemPrompt` is empty. Otherwise it's the full content of the picked `.md` file.
-
-## Legacy migration
-
-[src/main.ts:20](../../src/main.ts:20) rewrites the historical value `"from-folder"` to `"picker"` on first load after upgrade. The old behaviour read a fixed file from the prompts folder, which made every command run use the same prompt; the new behaviour shows the picker every time so the user can swap prompts per invocation without changing settings.
+If `llmIncludeInlineSystemPrompt` is `true` in the effective settings, the inline prompt is prepended to the template body with a blank-line separator. The template body is always present (even if the picker returns `null`, it becomes an empty string).
 
 ## Note-names augmentation
 
-The system prompt may be augmented by `buildNoteNamesBlock` *after* it is resolved — see [Note-names context](note-names-context.md). The resolved prompt and the note block are joined with `\n\n` ([insertResult.ts:102](../../src/commands/insertResult.ts:102)).
+Both commands pass the system prompt through the same note-names step — see [Note-names context](note-names-context.md). The resolved prompt and the note block are joined with `\n\n`.

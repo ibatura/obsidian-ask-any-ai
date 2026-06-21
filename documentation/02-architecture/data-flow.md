@@ -1,41 +1,35 @@
 # Data flow
 
-This diagram shows how the four input streams (raw user text, prompt source, vault note list, settings) merge into one provider request and one editor insertion.
+The plugin exposes two commands. Both share the same terminal pipeline (link expansion → provider call → insertion); they differ in how they produce the system prompt.
+
+## Ask AI (raw)
 
 ```mermaid
 flowchart TD
   RawInput[Raw text<br/>selection or current line]
-  WikilinkExp[expandObsidianLinks<br/>core/linkResolver.ts]
+  WikilinkExp[expandObsidianLinks]
   ExpandedUser[Expanded user content]
 
-  PromptMode{llmPromptMode}
-  PromptNone[empty string]
-  PromptInline[llmInlinePrompt<br/>or empty if toggle off]
-  PromptPicker[Picked .md file<br/>read from vault]
+  InlinePrompt[resolveInlinePrompt<br/>llmInlinePrompt if toggle on, else empty]
 
   NotesToggle{includeVaultNoteNames?}
-  NotesBlock[buildNoteNamesBlock<br/>core/noteNamesContext.ts]
+  NotesBlock[buildNoteNamesBlock<br/>includeNoteAliases flag]
   FinalSystem[Final system prompt]
 
   Validate[validateProviderSettings]
   Factory[createLlmClient]
-  Client[Provider client<br/>HTTP or CLI subprocess]
+  Client[Provider client]
   Result[Result string]
 
   Debug{debug?}
-  DebugBlock[Debug block:<br/>provider, model, prompt, content]
-  Heading[Optional heading<br/>llmResultHeading]
+  DebugBlock[Debug block]
+  Heading[Optional heading]
   Insertion{insertPosition}
   Editor[(Editor)]
 
   RawInput --> WikilinkExp --> ExpandedUser
 
-  PromptMode -- none --> PromptNone
-  PromptMode -- inline --> PromptInline
-  PromptMode -- picker --> PromptPicker
-  PromptNone --> NotesToggle
-  PromptInline --> NotesToggle
-  PromptPicker --> NotesToggle
+  InlinePrompt --> NotesToggle
   NotesToggle -- yes --> NotesBlock --> FinalSystem
   NotesToggle -- no --> FinalSystem
 
@@ -52,19 +46,85 @@ flowchart TD
   Insertion -- after-selection --> Editor
 ```
 
+## Ask AI with template
+
+```mermaid
+flowchart TD
+  RawInput[Raw text<br/>selection or current line]
+  WikilinkExp[expandObsidianLinks]
+  ExpandedUser[Expanded user content]
+
+  Picker[PromptPickerModal<br/>pick a .md file or None]
+  FileCache[app.metadataCache.getFileCache]
+  Frontmatter[Template frontmatter]
+  ParseOverrides[parseTemplateOverrides<br/>ai-* keys → TemplateOverrides]
+  ApplyOverrides[applyOverrides<br/>clone global + apply + validate creds]
+  EffectiveSettings[Effective settings]
+  Warnings[Warnings notice]
+
+  ReadFile[app.vault.read]
+  StripFM[stripFrontmatter<br/>slice past frontmatterPosition.end.offset]
+  TemplateBody[Template body]
+
+  InlinePrompt[resolveInlinePrompt<br/>using effective settings]
+  SystemPrompt[system prompt = inline + template body]
+
+  NotesToggle{includeVaultNoteNames?<br/>from effective settings}
+  NotesBlock[buildNoteNamesBlock<br/>includeNoteAliases flag]
+  FinalSystem[Final system prompt]
+
+  Validate[validateProviderSettings<br/>using effective settings]
+  Factory[createLlmClient]
+  Client[Provider client]
+  Result[Result string]
+
+  Debug{debug?}
+  DebugBlock[Debug block]
+  Heading[Optional heading]
+  Insertion{insertPosition}
+  Editor[(Editor)]
+
+  RawInput --> WikilinkExp --> ExpandedUser
+
+  Picker --> FileCache --> Frontmatter --> ParseOverrides
+  ParseOverrides --> ApplyOverrides --> EffectiveSettings
+  ApplyOverrides --> Warnings
+
+  Picker --> ReadFile --> StripFM --> TemplateBody
+  TemplateBody --> SystemPrompt
+  EffectiveSettings --> InlinePrompt --> SystemPrompt
+
+  SystemPrompt --> NotesToggle
+  NotesToggle -- yes --> NotesBlock --> FinalSystem
+  NotesToggle -- no --> FinalSystem
+
+  ExpandedUser --> Validate
+  FinalSystem --> Validate
+  EffectiveSettings --> Validate
+  Validate -- ok --> Factory --> Client --> Result
+
+  Result --> Debug
+  Debug -- yes --> DebugBlock --> Heading
+  Debug -- no --> Heading
+  Heading --> Insertion
+  Insertion -- end-of-file --> Editor
+  Insertion -- at-cursor --> Editor
+  Insertion -- after-selection --> Editor
+```
+
 ## Three streams that merge into the request
 
 | Stream | Source | Transformation | Result |
 |---|---|---|---|
 | **User content** | `editor.getSelection()` or `editor.getLine(line)` | `expandObsidianLinks` replaces every `[[...]]` with the linked file/section/block content | `expanded: string` |
-| **System prompt** | `llmPromptMode` decides: empty / inline / picker file | When `includeVaultNoteNames`, append `buildNoteNamesBlock(...)` joined with `\n\n` | `systemPrompt: string` |
-| **Provider settings** | `llmProvider`, credentials, `llmModel`, `timeoutMs` | `validateProviderSettings` + `createLlmClient` | `LlmClient` instance |
+| **System prompt** | Inline prompt (Ask AI) or template body (Ask AI with template); optionally augmented by `buildNoteNamesBlock` | When `includeVaultNoteNames`, append `buildNoteNamesBlock(...)` joined with `\n\n` | `systemPrompt: string` |
+| **Provider settings** | Global `AiAssistantSettings`, possibly overridden by template frontmatter (`ai-*` keys) for the template command | `validateProviderSettings` + `createLlmClient` | `LlmClient` instance |
 
-These three feed `client.generateResult({ systemPrompt, userContent })` ([insertResult.ts:121](../../src/commands/insertResult.ts:121)).
+These three feed `client.generateResult({ systemPrompt, userContent })` ([insertResult.ts](../../src/commands/insertResult.ts)).
 
 ## What gets inserted
 
-The block assembled at [insertResult.ts:132](../../src/commands/insertResult.ts:132) follows this exact layout:
+The block assembled at the end of `runRequest` follows this exact layout:
 
 ```
 \n\n
@@ -106,4 +166,4 @@ The fenced ` ```text ` blocks ensure that any Markdown inside the system prompt 
 - `"at-cursor"` → `editor.replaceSelection(block)` (replaces the selection)
 - `"after-selection"` → `editor.replaceRange(block, { line: cursor.line + 1, ch: 0 })` where `cursor` is `getCursor("to")`
 
-See [insertResult.ts:152](../../src/commands/insertResult.ts:152) for the dispatch.
+See [insertResult.ts](../../src/commands/insertResult.ts) for the dispatch.

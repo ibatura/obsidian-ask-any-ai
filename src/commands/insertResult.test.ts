@@ -77,6 +77,7 @@ function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistant
     llmIncludeInlineSystemPrompt: true,
     llmPromptsFolder: "",
     includeVaultNoteNames: false,
+    includeNoteAliases: false,
     vaultNoteNamesExclusions: ["Untitled*", "Screenshot*"],
     debug: false,
     ...overrides,

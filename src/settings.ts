@@ -38,6 +38,7 @@ export interface AiAssistantSettings {
 
   // Vault note names in context
   includeVaultNoteNames: boolean;
+  includeNoteAliases: boolean;
   vaultNoteNamesExclusions: string[];
 
   // Debugging
@@ -73,6 +74,7 @@ export const DEFAULT_SETTINGS: AiAssistantSettings = {
   insertPosition: "after-selection",
 
   includeVaultNoteNames: false,
+  includeNoteAliases: false,
   vaultNoteNamesExclusions: ["Untitled*", "Screenshot*"],
 
   debug: false,

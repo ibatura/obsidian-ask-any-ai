@@ -29,23 +29,23 @@ Provider-specific defaults inside the clients (used when `llmModel` is empty):
 | Gemini | `geminiApiBaseUrl` (defaults to `https://generativelanguage.googleapis.com`), `geminiApiKey` |
 | CLI | `cliCommand` (default `"claude"`), `cliArgs`, `cliCwd` |
 
-All credential strings default to `""`. The Claude and Gemini base URLs are special-cased — the client substitutes the public default when the field is empty, which is why both can validate as missing-only-if-non-http (see [insertResult.ts:27](../../src/commands/insertResult.ts:27) and [insertResult.ts:35](../../src/commands/insertResult.ts:35)).
+All credential strings default to `""`. The Claude and Gemini base URLs are special-cased — the client substitutes the public default when the field is empty, which is why both can validate as missing-only-if-non-http (see [providerValidation.ts](../../src/core/providerValidation.ts)).
 
 ### Prompt configuration
 
 | Field | Type | Default | Used by |
 |---|---|---|---|
-| `llmPromptMode` | `"none" \| "inline" \| "picker"` | `"picker"` | [promptResolver.ts:7](../../src/core/promptResolver.ts:7); [insertResult.ts:70](../../src/commands/insertResult.ts:70) |
-| `llmInlinePrompt` | `string` | `"You are an expert assistant. Generate the requested result in Markdown."` | [promptResolver.ts:12](../../src/core/promptResolver.ts:12) |
-| `llmIncludeInlineSystemPrompt` | `boolean` | `true` | [promptResolver.ts:11](../../src/core/promptResolver.ts:11) — when `false` in inline mode, no system prompt is sent |
-| `llmPromptsFolder` | `string` | `"Prompts/AI"` | [promptPickerModal.ts:27](../../src/ui/promptPickerModal.ts:27) |
+| `llmInlinePrompt` | `string` | `"You are an expert assistant. Generate the requested result in Markdown."` | [promptResolver.ts](../../src/core/promptResolver.ts) |
+| `llmIncludeInlineSystemPrompt` | `boolean` | `true` | [promptResolver.ts](../../src/core/promptResolver.ts) — when `false`, the inline prompt is not sent |
+| `llmPromptsFolder` | `string` | `"Prompts/AI"` | [promptPickerModal.ts](../../src/ui/promptPickerModal.ts) |
 
 ### Vault note names context
 
 | Field | Type | Default | Used by |
 |---|---|---|---|
-| `includeVaultNoteNames` | `boolean` | `false` | [insertResult.ts:99](../../src/commands/insertResult.ts:99) |
-| `vaultNoteNamesExclusions` | `string[]` | `["Untitled*", "Screenshot*"]` | [noteNamesContext.ts:42](../../src/core/noteNamesContext.ts:42) |
+| `includeVaultNoteNames` | `boolean` | `false` | [insertResult.ts](../../src/commands/insertResult.ts) |
+| `includeNoteAliases` | `boolean` | `false` | [noteNamesContext.ts](../../src/core/noteNamesContext.ts) — when `true`, each note's frontmatter aliases are rendered alongside the note name |
+| `vaultNoteNamesExclusions` | `string[]` | `["Untitled*", "Screenshot*"]` | [noteNamesContext.ts](../../src/core/noteNamesContext.ts) |
 
 ### Insertion + debug
 
@@ -77,4 +77,14 @@ async saveSettings() {
 
 ## Migration
 
-The only migration so far is the one-shot `"from-folder"` → `"picker"` rewrite at [src/main.ts:20](../../src/main.ts:20). It was added when the prompt-from-a-fixed-folder mode was replaced by the interactive picker (see [Prompt resolution](../03-features/prompt-resolution.md)). New migrations should follow the same shape: detect the legacy value during `loadSettings`, set the new value, call `await this.saveSettings()`.
+Migrations run during `loadSettings` ([src/main.ts](../../src/main.ts)) and persist the corrected value immediately with `await this.saveSettings()`.
+
+| When added | What it does |
+|---|---|
+| Initial | Removes the legacy `llmPromptMode` field (`"none" \| "inline" \| "picker"`). Prompt mode is now command-driven: **Ask AI** always uses the inline prompt, **Ask AI with template** always opens the picker. |
+
+New migrations should follow the same shape: detect the legacy value, apply the correction, and save.
+
+## Per-run overrides
+
+The `llmProvider`, `llmModel`, `llmResultHeading`, `insertPosition`, `debug`, `llmIncludeInlineSystemPrompt`, `includeVaultNoteNames`, and `includeNoteAliases` fields can be overridden on a per-invocation basis by the **Ask AI with template** command via `ai-*` YAML properties in the template's frontmatter. The override is applied to a shallow clone of `settings` — global settings are never mutated. See [Template overrides](../03-features/template-overrides.md).

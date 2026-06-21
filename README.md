@@ -17,14 +17,18 @@ Run any LLM from inside your note. Select text, hit a hotkey, get the result ins
 
 ## What it does
 
-A single command — **Ask AI** — runs the following pipeline every time you invoke it:
+Two commands share the same core pipeline:
 
-1. Reads the **selection** (or the current line if nothing is selected).
-2. Optionally opens a **prompt picker** so you can choose a system-prompt file from a vault folder at invocation time.
-3. **Expands `[[wikilinks]]`** in the input — `[[Note]]`, `[[Note#Heading]]`, or `[[Note#^block]]` — replacing them with the linked content before anything is sent to the LLM.
-4. Optionally appends a list of **vault note names** to the system prompt so the LLM can write back resolvable wikilinks.
-5. Sends the request to your configured provider.
-6. Inserts the response into the note at the position you chose (after the selection, replacing the selection, or at the end of the file).
+- **Ask AI** — uses the inline system prompt (or no prompt) and sends immediately.
+- **Ask AI with template** — opens a picker so you choose a `.md` file from your prompts folder. The file body becomes the system prompt; its YAML frontmatter can override per-run settings (model, provider, insertion position, and more).
+
+Both commands:
+
+1. Read the **selection** (or the current line if nothing is selected).
+2. **Expand `[[wikilinks]]`** in the input — `[[Note]]`, `[[Note#Heading]]`, or `[[Note#^block]]` — replacing them with the linked content before anything is sent to the LLM.
+3. Optionally append a list of **vault note names** to the system prompt so the LLM can write back resolvable wikilinks.
+4. Send the request to your configured provider.
+5. Insert the response into the note at the position you chose (after the selection, replacing the selection, or at the end of the file).
 
 A persistent progress notice shows where you are in the pipeline and how long it has taken.
 
@@ -33,9 +37,10 @@ A persistent progress notice shows where you are in the pipeline and how long it
 ## Features
 
 - **Five providers** — GitHub Copilot (any OpenAI-compatible endpoint), Anthropic Claude, Claude via OpenAI-compatible proxies (OpenRouter, Together, internal gateways), Google Gemini, and any local CLI (`claude`, `llm`, `gemini`, …).
-- **Three prompt modes** — no system prompt, a static inline prompt, or pick a `.md` file from a vault folder at invocation time.
+- **Two commands** — **Ask AI** (inline prompt) and **Ask AI with template** (picker + optional frontmatter overrides).
+- **Template frontmatter overrides** — add `ai-model`, `ai-provider`, `ai-insert-position`, and other `ai-*` YAML keys to any template file to override plugin settings for that single invocation. Invalid values warn and fall back gracefully; global settings are never mutated.
 - **Wikilink expansion** with full support for nested heading paths (`#A#B`) and block references (`#^id`).
-- **Vault-aware context** — optionally include a list of vault note names in the system prompt with glob-based exclusions (`Untitled*`, `Daily/*`, …) so the LLM can emit wikilinks that resolve.
+- **Vault-aware context** — optionally include a list of vault note names in the system prompt with glob-based exclusions (`Untitled*`, `Daily/*`, …) and optional alias rendering so the LLM can emit wikilinks that resolve.
 - **Three insertion positions** — after selection (default), at cursor / replacing the selection, or end of file.
 - **Configurable result heading** — set it to `AI Result`, leave blank to disable, or use any heading you like.
 - **Debug mode** — prepend the exact request payload (provider, model, system prompt, user content) to the result so you can see what was sent.
@@ -90,13 +95,12 @@ The fields shown depend on the selected provider:
 | Gemini | Base URL (defaults to `https://generativelanguage.googleapis.com`) + API key |
 | Local CLI | Command, optional args, optional working directory |
 
-### 3. Prompt mode
+### 3. Inline prompt
 
-- **None** — no system prompt.
-- **Inline** — use the fixed prompt you type into settings. A toggle lets you skip sending it without losing it.
-- **Pick at invocation** — show a picker every time the command runs so you can choose a `.md` file from a vault folder.
+- **System prompt** — the fixed prompt used by **Ask AI**. A toggle lets you skip sending it without clearing it.
+- **Prompts templates folder** — vault-relative folder scanned by **Ask AI with template** for `.md` files (default: `Prompts/AI`).
 
-When picker mode is active, set **Prompts templates folder** to the vault-relative folder that holds your prompt notes (default: `Prompts/AI`).
+When `llmIncludeInlineSystemPrompt` is on, **Ask AI with template** prepends the inline prompt before the template body.
 
 ### 4. Vault note names context
 
@@ -105,6 +109,8 @@ Optional. When on, the plugin appends a Markdown block listing every note in the
 - `Untitled*` — any note starting with "Untitled".
 - `Screenshot*` — any clipboard-image note.
 - `Daily/2024-*` — folder-scoped pattern (uses `/`).
+
+**Include note aliases** — when enabled, each note's frontmatter aliases are listed alongside it (`Note Name (aka: alias1, alias2)`), letting the LLM use either name.
 
 ### 5. Result insertion
 
@@ -134,9 +140,28 @@ When you run the command:
 2. The expanded text is sent to your provider.
 3. The summary is inserted under `## AI Result` (or your configured heading).
 
-### Picker mode
+### Ask AI with template
 
-In picker mode, the modal shows every `.md` file in your prompts folder plus a "None" option. Pick a file to use it as the system prompt for *this* invocation only — no settings are mutated.
+Run **Ask AI with template** to open a modal showing every `.md` file in your prompts folder plus a "None" option. Pick a file to use it as the system prompt for *this* invocation only — no settings are mutated.
+
+#### Template frontmatter overrides
+
+Add `ai-*` YAML keys to the template's frontmatter to override settings for that single run:
+
+```yaml
+---
+ai-provider: claude
+ai-model: claude-haiku-4-5-20251001
+ai-result-heading: Translation
+ai-insert-position: end-of-file
+ai-include-note-names: true
+---
+You are a professional translator. Translate the following to French.
+```
+
+Supported keys: `ai-provider`, `ai-model`, `ai-result-heading`, `ai-insert-position`, `ai-debug`, `ai-include-inline-prompt`, `ai-include-note-names`, `ai-include-note-aliases`.
+
+Invalid values warn and fall back to the global setting; the warning is shown in a single notice. See [`documentation/03-features/template-overrides.md`](documentation/03-features/template-overrides.md) for the full reference.
 
 ---
 
