@@ -8,13 +8,14 @@ When `settings.debug` is `true`, the plugin prepends a debug block to the insert
 
 ```ts
 if (settings.debug) {
-  const model = settings.llmModel.trim() || "(default)";
+  const model = connection.model.trim() || "(default)";
   const systemBlock = systemPrompt.trim()
     ? "```text\n" + systemPrompt + "\n```"
     : "_(empty)_";
   block +=
     `## AI Request (debug)\n\n` +
-    `**Provider:** ${settings.llmProvider}\n` +
+    `**Connection:** ${connection.name}\n` +
+    `**Provider:** ${connection.provider}\n` +
     `**Model:** ${model}\n\n` +
     `### System prompt\n\n${systemBlock}\n\n` +
     `### User content\n\n\`\`\`text\n${expanded}\n\`\`\`\n\n`;
@@ -29,8 +30,9 @@ The block is appended to the same `block` string that holds the heading + result
 \n\n
 ## AI Request (debug)
 
-**Provider:** <llmProvider>
-**Model:** <llmModel or "(default)">
+**Connection:** <connection.name>
+**Provider:** <connection.provider>
+**Model:** <connection.model or "(default)">
 
 ### System prompt
 
@@ -59,8 +61,9 @@ The `text` language tag is intentional (rather than no language) so syntax highl
 
 | Field | Source |
 |---|---|
-| `Provider` | `settings.llmProvider` (raw enum value: `copilot`, `claude`, `claude-proxy`, `gemini`, `cli`) |
-| `Model` | `settings.llmModel.trim()`; falls back to literal string `"(default)"` when empty |
+| `Connection` | `connection.name` — the user-facing name of the resolved connection |
+| `Provider` | `connection.provider` (raw enum value: `copilot`, `claude`, `claude-proxy`, `gemini`, `cli`) |
+| `Model` | `connection.model.trim()`; falls back to literal string `"(default)"` when empty |
 | `System prompt` | Final post-resolution prompt (after picker/inline/none + optional note-names append) |
 | `User content` | Post-expansion content (after `expandObsidianLinks` replaces every `[[...]]`) |
 

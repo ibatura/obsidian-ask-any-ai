@@ -1,6 +1,6 @@
 # AI Assistant for Obsidian
 
-Run any LLM from inside your note. Select text, hit a hotkey, get the result inserted in place — with `[[wikilinks]]` automatically expanded, your own system prompts, and a choice of five providers including local CLI tools.
+Run any LLM from inside your note. Select text, hit a hotkey, get the result inserted in place — with `[[wikilinks]]` automatically expanded, your own system prompts, and support for multiple named connections across five provider types.
 
 > **Status**: desktop-only · Obsidian ≥ 1.5.0 · `id: ai-assistant`
 
@@ -9,7 +9,7 @@ Run any LLM from inside your note. Select text, hit a hotkey, get the result ins
 ## Quick start
 
 1. Install the plugin (see [Installation](#installation)).
-2. Open **Settings → AI Assistant** and configure one provider — for example, paste a Claude API key.
+2. Open **Settings → AI Assistant**. A default "Default" connection (Copilot) is pre-configured — fill in the API key, or add a new connection for a different provider.
 3. In any note, select a sentence and run **Ask AI** from the command palette (`Ctrl/Cmd+P`).
 4. The result is inserted just below your selection under an `## AI Result` heading.
 
@@ -38,7 +38,7 @@ A persistent progress notice shows where you are in the pipeline and how long it
 
 - **Five providers** — GitHub Copilot (any OpenAI-compatible endpoint), Anthropic Claude, Claude via OpenAI-compatible proxies (OpenRouter, Together, internal gateways), Google Gemini, and any local CLI (`claude`, `llm`, `gemini`, …).
 - **Two commands** — **Ask AI** (inline prompt) and **Ask AI with template** (picker + optional frontmatter overrides).
-- **Template frontmatter overrides** — add `ai-model`, `ai-provider`, `ai-insert-position`, and other `ai-*` YAML keys to any template file to override plugin settings for that single invocation. Invalid values warn and fall back gracefully; global settings are never mutated.
+- **Template frontmatter overrides** — add `ai-llm`, `ai-model`, `ai-insert-position`, and other `ai-*` YAML keys to any template file to override plugin settings for that single invocation. Invalid values warn and fall back gracefully; global settings are never mutated.
 - **Wikilink expansion** with full support for nested heading paths (`#A#B`) and block references (`#^id`).
 - **Vault-aware context** — optionally include a list of vault note names in the system prompt with glob-based exclusions (`Untitled*`, `Daily/*`, …) and optional alias rendering so the LLM can emit wikilinks that resolve.
 - **Three insertion positions** — after selection (default), at cursor / replacing the selection, or end of file.
@@ -75,17 +75,16 @@ A persistent progress notice shows where you are in the pipeline and how long it
 
 ## Configuration
 
-Open **Settings → AI Assistant**. The settings tab has five sections.
+Open **Settings → AI Assistant**. The settings tab has four sections.
 
-### 1. Provider and connection
+### 1. LLM connections
 
-- **Provider** — pick `Copilot`, `Claude`, `Claude (proxy)`, `Gemini`, or `Local CLI`.
-- **Model** — leave blank to use the provider's default (`gpt-4.1-mini`, `claude-sonnet-4-20250514`, `gemini-2.0-flash`). For Claude proxies you must set this explicitly (e.g. `anthropic/claude-3.7-sonnet` for OpenRouter).
-- **Timeout (ms)** — used by the local CLI provider.
+Manage one or more named LLM connections. Each connection has:
 
-### 2. Credentials
-
-The fields shown depend on the selected provider:
+- **Name** — a label you can reference in templates with `ai-llm: <Name>`.
+- **Provider** — `Copilot`, `Claude`, `Claude (proxy)`, `Gemini`, or `Local CLI`.
+- **Default model** — leave blank to use the provider's built-in default (`gpt-4.1-mini`, `claude-sonnet-4-20250514`, `gemini-2.0-flash`). Claude proxies require an explicit model (e.g. `anthropic/claude-3.7-sonnet` for OpenRouter).
+- **Credential fields** (vary by provider):
 
 | Provider | Fields |
 |---|---|
@@ -95,14 +94,19 @@ The fields shown depend on the selected provider:
 | Gemini | Base URL (defaults to `https://generativelanguage.googleapis.com`) + API key |
 | Local CLI | Command, optional args, optional working directory |
 
-### 3. Inline prompt
+- **Set as default** — the connection used when no template specifies `ai-llm`.
+- **Remove** — deletes the connection (at least one must remain).
+
+Use **+ Add connection** to create additional connections. Use **Request timeout** to set the maximum wait time for CLI responses.
+
+### 2. System prompt & templates
 
 - **System prompt** — the fixed prompt used by **Ask AI**. A toggle lets you skip sending it without clearing it.
 - **Prompts templates folder** — vault-relative folder scanned by **Ask AI with template** for `.md` files (default: `Prompts/AI`).
 
-When `llmIncludeInlineSystemPrompt` is on, **Ask AI with template** prepends the inline prompt before the template body.
+When the include-system-prompt toggle is on, **Ask AI with template** prepends the inline prompt before the template body.
 
-### 4. Vault note names context
+### 3. Vault note names context
 
 Optional. When on, the plugin appends a Markdown block listing every note in the vault to the system prompt, plus an instruction telling the LLM to wrap matches in `[[...]]`. **Exclusions** is a list of glob patterns:
 
@@ -112,7 +116,7 @@ Optional. When on, the plugin appends a Markdown block listing every note in the
 
 **Include note aliases** — when enabled, each note's frontmatter aliases are listed alongside it (`Note Name (aka: alias1, alias2)`), letting the LLM use either name.
 
-### 5. Result insertion
+### 4. Result insertion
 
 - **Result heading** — Markdown heading inserted before the response. Empty string disables it.
 - **Insert position** — `After selection` (default), `At cursor`, or `End of file`.
@@ -150,7 +154,7 @@ Add `ai-*` YAML keys to the template's frontmatter to override settings for that
 
 ```yaml
 ---
-ai-provider: claude
+ai-llm: Work Claude
 ai-model: claude-haiku-4-5-20251001
 ai-result-heading: Translation
 ai-insert-position: end-of-file
@@ -159,7 +163,7 @@ ai-include-note-names: true
 You are a professional translator. Translate the following to French.
 ```
 
-Supported keys: `ai-provider`, `ai-model`, `ai-result-heading`, `ai-insert-position`, `ai-debug`, `ai-include-inline-prompt`, `ai-include-note-names`, `ai-include-note-aliases`.
+`ai-llm` selects a connection by name; `ai-model` overrides its model for this run. Supported keys: `ai-llm`, `ai-model`, `ai-result-heading`, `ai-insert-position`, `ai-debug`, `ai-include-inline-prompt`, `ai-include-note-names`, `ai-include-note-aliases`.
 
 Invalid values warn and fall back to the global setting; the warning is shown in a single notice. See [`documentation/03-features/template-overrides.md`](documentation/03-features/template-overrides.md) for the full reference.
 

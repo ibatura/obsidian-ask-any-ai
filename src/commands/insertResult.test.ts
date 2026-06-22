@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { insertLlmResultRaw, insertLlmResultWithTemplate } from "./insertResult";
-import { AiAssistantSettings } from "../settings";
+import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
 
 let mockOpenAndAwait = vi.fn().mockResolvedValue(null as null);
 
@@ -55,24 +55,29 @@ function makeApp() {
   };
 }
 
-function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+function makeCliConnection(overrides: Partial<LlmConnection> = {}): LlmConnection {
   return {
-    insertPosition: "after-selection",
-    llmResultHeading: "AI Result",
-    llmProvider: "cli",
-    llmModel: "",
-    timeoutMs: 60000,
-    copilotApiBaseUrl: "",
-    copilotApiKey: "",
-    claudeApiBaseUrl: "",
-    claudeApiKey: "",
-    claudeProxyApiBaseUrl: "",
-    claudeProxyApiKey: "",
-    geminiApiBaseUrl: "",
-    geminiApiKey: "",
+    id: generateConnectionId(),
+    name: "Test CLI",
+    provider: "cli",
+    model: "",
+    baseUrl: "",
+    apiKey: "",
     cliCommand: "echo",
     cliArgs: "",
     cliCwd: "",
+    ...overrides,
+  };
+}
+
+function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+  const conn = makeCliConnection();
+  return {
+    connections: [conn],
+    defaultConnectionId: conn.id,
+    insertPosition: "after-selection",
+    llmResultHeading: "AI Result",
+    timeoutMs: 60000,
     llmInlinePrompt: "You are an expert assistant.",
     llmIncludeInlineSystemPrompt: true,
     llmPromptsFolder: "",
@@ -148,7 +153,7 @@ describe("insertLlmResultRaw", () => {
       unresolved: [],
     });
 
-    // Command will run to provider validation (cli with echo command passes)
+    // Command will run to connection resolution (cli with echo command passes)
     await insertLlmResultRaw(mockEditor as any, mockFile as any, mockApp as any, mockSettings);
     // No errors thrown means the flow proceeded past prompt resolution
   });
@@ -173,7 +178,7 @@ describe("insertLlmResultRaw", () => {
     });
 
     await insertLlmResultRaw(mockEditor as any, mockFile as any, mockApp as any, mockSettings);
-    // Command continues (provider validation fires next since cliCommand is set)
+    // Command continues (connection is valid since cliCommand is set)
   });
 });
 

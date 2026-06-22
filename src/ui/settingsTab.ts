@@ -1,5 +1,14 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type AiAssistantPlugin from "../main";
+import { LlmConnection, LlmProvider, generateConnectionId } from "../settings";
+
+const MODEL_PLACEHOLDERS: Record<LlmProvider, string> = {
+  copilot: "e.g. gpt-4.1-mini",
+  claude: "e.g. claude-sonnet-4-20250514",
+  "claude-proxy": "e.g. anthropic/claude-3.7-sonnet",
+  gemini: "e.g. gemini-2.0-flash",
+  cli: "",
+};
 
 export class AiAssistantSettingTab extends PluginSettingTab {
   plugin: AiAssistantPlugin;
@@ -16,44 +25,310 @@ export class AiAssistantSettingTab extends PluginSettingTab {
       .setDesc(description);
   }
 
-  display(): void {
+  private renderConnection(conn: LlmConnection): void {
     const { containerEl } = this;
-    containerEl.empty();
+    const isDefault = conn.id === this.plugin.settings.defaultConnectionId;
 
-    // ── Section A: Provider & Connection ──────────────────────────────────────
-    this.addSectionHeader(
-      "LLM provider & connection",
-      "Choose which AI service to use and how to connect."
-    );
-
+    // Name
     new Setting(containerEl)
-      .setName("AI provider")
-      .setDesc("Choose which AI backend to use.")
+      .setName("Name")
+      .setDesc(
+        isDefault
+          ? "Identifies this connection in templates (ai-llm: Name). Currently the default."
+          : "Identifies this connection in templates (ai-llm: Name)."
+      )
+      .addText(text =>
+        text
+          .setPlaceholder("e.g. Work Claude")
+          .setValue(conn.name)
+          .onChange(async (value) => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              new Notice("Connection name cannot be empty.");
+              text.setValue(conn.name);
+              return;
+            }
+            const duplicate = this.plugin.settings.connections.some(
+              c => c.id !== conn.id && c.name.trim().toLowerCase() === trimmed.toLowerCase()
+            );
+            if (duplicate) {
+              new Notice(`Name "${trimmed}" is already used by another connection.`);
+              text.setValue(conn.name);
+              return;
+            }
+            conn.name = trimmed;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Provider
+    new Setting(containerEl)
+      .setName("Provider")
       .addDropdown(drop =>
         drop
           .addOption("copilot", "Copilot")
           .addOption("claude", "Claude")
-          .addOption("claude-proxy", "Claude (OpenAI-compatible proxy)")
+          .addOption("claude-proxy", "Claude (proxy)")
           .addOption("gemini", "Gemini")
           .addOption("cli", "Local CLI")
-          .setValue(this.plugin.settings.llmProvider)
+          .setValue(conn.provider)
           .onChange(async (value) => {
-            this.plugin.settings.llmProvider = value as "copilot" | "claude" | "claude-proxy" | "gemini" | "cli";
+            conn.provider = value as LlmProvider;
             await this.plugin.saveSettings();
             this.display();
           })
       );
 
+    // Model
     new Setting(containerEl)
-      .setName("Model")
-      .setDesc("Provider-specific model ID (leave empty for the provider default).")
+      .setName("Default model")
+      .setDesc("Override the provider default. Leave empty to use the provider's built-in default.")
       .addText(text =>
         text
-          .setPlaceholder("e.g. gpt-4.1-mini, claude-3.7-sonnet")
-          .setValue(this.plugin.settings.llmModel)
+          .setPlaceholder(MODEL_PLACEHOLDERS[conn.provider])
+          .setValue(conn.model)
           .onChange(async (value) => {
-            this.plugin.settings.llmModel = value.trim();
+            conn.model = value.trim();
             await this.plugin.saveSettings();
+          })
+      );
+
+    // Credentials per provider
+    if (conn.provider === "copilot") {
+      new Setting(containerEl)
+        .setName("Copilot API base URL")
+        .setDesc("Base URL for the Copilot (or Copilot proxy) endpoint.")
+        .addText(text =>
+          text
+            .setPlaceholder("https://api.githubcopilot.com")
+            .setValue(conn.baseUrl)
+            .onChange(async (value) => {
+              conn.baseUrl = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Copilot API key")
+        .setDesc("API key / token for Copilot. Required.")
+        .addText(text =>
+          text
+            .setPlaceholder("token...")
+            .setValue(conn.apiKey)
+            .onChange(async (value) => {
+              conn.apiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (conn.provider === "claude") {
+      new Setting(containerEl)
+        .setName("Claude API base URL")
+        .setDesc("Base URL for the Anthropic Messages API. Leave empty to use the default.")
+        .addText(text =>
+          text
+            .setPlaceholder("https://api.anthropic.com")
+            .setValue(conn.baseUrl)
+            .onChange(async (value) => {
+              conn.baseUrl = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Claude API key")
+        .setDesc("API key for Claude. Required.")
+        .addText(text =>
+          text
+            .setPlaceholder("sk-ant-...")
+            .setValue(conn.apiKey)
+            .onChange(async (value) => {
+              conn.apiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (conn.provider === "claude-proxy") {
+      new Setting(containerEl)
+        .setName("Claude proxy API base URL")
+        .setDesc("Base URL of an OpenAI-compatible endpoint that exposes Claude (e.g. OpenRouter, Together, internal gateway).")
+        .addText(text =>
+          text
+            .setPlaceholder("https://openrouter.ai/api")
+            .setValue(conn.baseUrl)
+            .onChange(async (value) => {
+              conn.baseUrl = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Claude proxy API key")
+        .setDesc("OpenAI-format API key for the proxy. Sent as Authorization: Bearer <key>.")
+        .addText(text =>
+          text
+            .setPlaceholder("sk-...")
+            .setValue(conn.apiKey)
+            .onChange(async (value) => {
+              conn.apiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (conn.provider === "gemini") {
+      new Setting(containerEl)
+        .setName("Gemini API base URL")
+        .setDesc("Base URL for the Gemini API. Leave empty to use the default.")
+        .addText(text =>
+          text
+            .setPlaceholder("https://generativelanguage.googleapis.com")
+            .setValue(conn.baseUrl)
+            .onChange(async (value) => {
+              conn.baseUrl = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Gemini API key")
+        .setDesc("API key for Gemini. Required.")
+        .addText(text =>
+          text
+            .setPlaceholder("AI...")
+            .setValue(conn.apiKey)
+            .onChange(async (value) => {
+              conn.apiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (conn.provider === "cli") {
+      new Setting(containerEl)
+        .setName("CLI command")
+        .setDesc("Binary name (e.g. claude) or absolute path. The prompt text is piped to stdin.")
+        .addText(text =>
+          text
+            .setPlaceholder("claude")
+            .setValue(conn.cliCommand)
+            .onChange(async (value) => {
+              conn.cliCommand = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("CLI arguments")
+        .setDesc("Extra arguments passed to the CLI, space-separated.")
+        .addText(text =>
+          text
+            .setPlaceholder("-p")
+            .setValue(conn.cliArgs)
+            .onChange(async (value) => {
+              conn.cliArgs = value;
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Working directory")
+        .setDesc("Leave empty to inherit from Obsidian; override to run in a specific directory.")
+        .addText(text =>
+          text
+            .setPlaceholder("/path/to/cwd (optional)")
+            .setValue(conn.cliCwd)
+            .onChange(async (value) => {
+              conn.cliCwd = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    // Set-as-default + Remove controls
+    const controls = new Setting(containerEl);
+    controls.addButton(btn => {
+      if (isDefault) {
+        btn.setButtonText("★ Default").setDisabled(true);
+      } else {
+        btn.setButtonText("Set as default").onClick(async () => {
+          this.plugin.settings.defaultConnectionId = conn.id;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      }
+      return btn;
+    });
+    controls.addButton(btn =>
+      btn
+        .setButtonText("Remove")
+        .setWarning()
+        .onClick(async () => {
+          if (this.plugin.settings.connections.length <= 1) {
+            new Notice("At least one connection is required.");
+            return;
+          }
+          const idx = this.plugin.settings.connections.findIndex(c => c.id === conn.id);
+          this.plugin.settings.connections.splice(idx, 1);
+          if (this.plugin.settings.defaultConnectionId === conn.id) {
+            const first = this.plugin.settings.connections[0];
+            if (first) this.plugin.settings.defaultConnectionId = first.id;
+          }
+          await this.plugin.saveSettings();
+          this.display();
+        })
+    );
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    // ── Section A: Connections ─────────────────────────────────────────────────
+    this.addSectionHeader(
+      "LLM connections",
+      "Add one or more named connections. The default is used for 'Ask AI'; templates can override it via ai-llm: <Name>."
+    );
+
+    const connections = this.plugin.settings.connections;
+    let connIdx = 0;
+    for (const conn of connections) {
+      if (connIdx > 0) {
+        containerEl.createEl("hr");
+      }
+      this.renderConnection(conn);
+      connIdx++;
+    }
+
+    new Setting(containerEl)
+      .addButton(btn =>
+        btn
+          .setButtonText("+ Add connection")
+          .onClick(async () => {
+            const existing = new Set(
+              this.plugin.settings.connections.map(c => c.name.toLowerCase())
+            );
+            let candidate = "New connection";
+            let n = 2;
+            while (existing.has(candidate.toLowerCase())) {
+              candidate = `New connection ${n++}`;
+            }
+            const conn: LlmConnection = {
+              id: generateConnectionId(),
+              name: candidate,
+              provider: "copilot",
+              model: "",
+              baseUrl: "",
+              apiKey: "",
+              cliCommand: "",
+              cliArgs: "",
+              cliCwd: "",
+            };
+            this.plugin.settings.connections.push(conn);
+            await this.plugin.saveSettings();
+            this.display();
           })
       );
 
@@ -72,165 +347,6 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             }
           })
       );
-
-    // ── Section B: API Credentials ────────────────────────────────────────────
-    this.addSectionHeader(
-      "API credentials",
-      "Enter authentication details for your chosen provider. Stored securely in Obsidian's configuration."
-    );
-
-    if (this.plugin.settings.llmProvider === "copilot") {
-      new Setting(containerEl)
-        .setName("Copilot API base URL")
-        .setDesc("Base URL for the Copilot (or Copilot proxy) endpoint.")
-        .addText(text =>
-          text
-            .setPlaceholder("https://api.githubcopilot.com")
-            .setValue(this.plugin.settings.copilotApiBaseUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.copilotApiBaseUrl = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Copilot API key")
-        .setDesc("API key / token for Copilot. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("token...")
-            .setValue(this.plugin.settings.copilotApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.copilotApiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (this.plugin.settings.llmProvider === "claude") {
-      new Setting(containerEl)
-        .setName("Claude API base URL")
-        .setDesc("Base URL for the Anthropic Messages API. Leave empty to use the default.")
-        .addText(text =>
-          text
-            .setPlaceholder("https://api.anthropic.com")
-            .setValue(this.plugin.settings.claudeApiBaseUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.claudeApiBaseUrl = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Claude API key")
-        .setDesc("API key for Claude. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("sk-ant-...")
-            .setValue(this.plugin.settings.claudeApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.claudeApiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (this.plugin.settings.llmProvider === "claude-proxy") {
-      new Setting(containerEl)
-        .setName("Claude proxy API base URL")
-        .setDesc("Base URL of an OpenAI-compatible endpoint that exposes Claude (e.g. OpenRouter, Together, internal gateway).")
-        .addText(text =>
-          text
-            .setPlaceholder("https://openrouter.ai/api")
-            .setValue(this.plugin.settings.claudeProxyApiBaseUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.claudeProxyApiBaseUrl = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Claude proxy API key")
-        .setDesc("OpenAI-format API key for the proxy. Sent as Authorization: Bearer <key>.")
-        .addText(text =>
-          text
-            .setPlaceholder("sk-...")
-            .setValue(this.plugin.settings.claudeProxyApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.claudeProxyApiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (this.plugin.settings.llmProvider === "gemini") {
-      new Setting(containerEl)
-        .setName("Gemini API base URL")
-        .setDesc("Base URL for the Gemini API. Leave empty to use the default.")
-        .addText(text =>
-          text
-            .setPlaceholder("https://generativelanguage.googleapis.com")
-            .setValue(this.plugin.settings.geminiApiBaseUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.geminiApiBaseUrl = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Gemini API key")
-        .setDesc("API key for Gemini. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("AI...")
-            .setValue(this.plugin.settings.geminiApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.geminiApiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (this.plugin.settings.llmProvider === "cli") {
-      new Setting(containerEl)
-        .setName("CLI command")
-        .setDesc("Binary name (e.g. claude) or absolute path. The prompt text is piped to stdin.")
-        .addText(text =>
-          text
-            .setPlaceholder("claude")
-            .setValue(this.plugin.settings.cliCommand)
-            .onChange(async (value) => {
-              this.plugin.settings.cliCommand = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("CLI arguments")
-        .setDesc("Extra arguments passed to the CLI, space-separated.")
-        .addText(text =>
-          text
-            .setPlaceholder("-p")
-            .setValue(this.plugin.settings.cliArgs)
-            .onChange(async (value) => {
-              this.plugin.settings.cliArgs = value;
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Working directory")
-        .setDesc("Leave empty to inherit from Obsidian; override to run in a specific directory.")
-        .addText(text =>
-          text
-            .setPlaceholder("/path/to/cwd (optional)")
-            .setValue(this.plugin.settings.cliCwd)
-            .onChange(async (value) => {
-              this.plugin.settings.cliCwd = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
 
     // ── Section C: System prompt & templates ──────────────────────────────────
     this.addSectionHeader(

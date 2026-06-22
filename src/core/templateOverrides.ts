@@ -1,14 +1,10 @@
-import { AiAssistantSettings, LlmProvider } from "../settings";
-import { validateProviderSettings } from "./providerValidation";
+import { AiAssistantSettings } from "../settings";
 
-const ALLOWED_PROVIDERS: LlmProvider[] = ["copilot", "claude", "claude-proxy", "gemini", "cli"];
 const ALLOWED_INSERT_POSITIONS = ["at-cursor", "after-selection", "end-of-file"] as const;
 
 export type TemplateOverrides = Partial<
   Pick<
     AiAssistantSettings,
-    | "llmModel"
-    | "llmProvider"
     | "llmResultHeading"
     | "insertPosition"
     | "debug"
@@ -20,6 +16,8 @@ export type TemplateOverrides = Partial<
 
 export interface ParseResult {
   overrides: TemplateOverrides;
+  llmName?: string;
+  modelOverride?: string;
   warnings: string[];
 }
 
@@ -31,8 +29,6 @@ export interface ApplyResult {
 type FrontmatterPosition = { end: { offset: number } };
 
 const AI_KEY_TO_SETTING: Record<string, keyof TemplateOverrides> = {
-  "ai-model": "llmModel",
-  "ai-provider": "llmProvider",
   "ai-result-heading": "llmResultHeading",
   "ai-insert-position": "insertPosition",
   "ai-debug": "debug",
@@ -53,25 +49,34 @@ export function parseTemplateOverrides(
 ): ParseResult {
   const overrides: TemplateOverrides = {};
   const warnings: string[] = [];
+  let llmName: string | undefined;
+  let modelOverride: string | undefined;
 
   if (!frontmatter) return { overrides, warnings };
 
   for (const [key, value] of Object.entries(frontmatter)) {
     if (!key.startsWith("ai-")) continue;
 
-    if (!(key in AI_KEY_TO_SETTING)) {
-      warnings.push(`Unknown template property "${key}" — ignored.`);
+    if (key === "ai-llm") {
+      if (typeof value !== "string" || !value.trim()) {
+        warnings.push(`Invalid value for "ai-llm": expected a non-empty string. Using the default connection.`);
+      } else {
+        llmName = value.trim();
+      }
       continue;
     }
 
-    if (key === "ai-provider") {
-      if (!ALLOWED_PROVIDERS.includes(value as LlmProvider)) {
-        warnings.push(
-          `Invalid value for "${key}": "${value}" — expected one of ${ALLOWED_PROVIDERS.join(", ")}. Using global setting.`
-        );
+    if (key === "ai-model") {
+      if (typeof value !== "string") {
+        warnings.push(`Invalid value for "ai-model": expected a string. Using global setting.`);
       } else {
-        overrides.llmProvider = value as LlmProvider;
+        modelOverride = value;
       }
+      continue;
+    }
+
+    if (!(key in AI_KEY_TO_SETTING)) {
+      warnings.push(`Unknown template property "${key}" — ignored.`);
       continue;
     }
 
@@ -97,7 +102,7 @@ export function parseTemplateOverrides(
       continue;
     }
 
-    // ai-model and ai-result-heading: any string
+    // ai-result-heading: any string
     if (typeof value !== "string") {
       warnings.push(`Invalid value for "${key}": expected a string. Using global setting.`);
     } else {
@@ -105,29 +110,15 @@ export function parseTemplateOverrides(
     }
   }
 
-  return { overrides, warnings };
+  return { overrides, llmName, modelOverride, warnings };
 }
 
 export function applyOverrides(
   global: AiAssistantSettings,
   overrides: TemplateOverrides
 ): ApplyResult {
-  const warnings: string[] = [];
   const effective: AiAssistantSettings = { ...global, ...overrides };
-
-  // If provider or model was overridden, validate credentials for the effective provider
-  if (overrides.llmProvider !== undefined || overrides.llmModel !== undefined) {
-    const credError = validateProviderSettings(effective);
-    if (credError) {
-      warnings.push(
-        `Template specifies provider "${effective.llmProvider}" but it has no configured credentials — reverting to global provider. (${credError})`
-      );
-      effective.llmProvider = global.llmProvider;
-      effective.llmModel = global.llmModel;
-    }
-  }
-
-  return { effective, warnings };
+  return { effective, warnings: [] };
 }
 
 export function stripFrontmatter(

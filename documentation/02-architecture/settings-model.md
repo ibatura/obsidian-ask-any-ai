@@ -1,35 +1,55 @@
 # Settings model
 
-The settings shape is defined in [src/settings.ts](../../src/settings.ts) as the `AiAssistantSettings` interface. Defaults live in `DEFAULT_SETTINGS` ([src/settings.ts:48](../../src/settings.ts:48)). The settings UI in [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) renders the same fields, grouped into five logical sections.
+The settings shape is defined in [src/settings.ts](../../src/settings.ts) as the `AiAssistantSettings` interface. Defaults live in `DEFAULT_SETTINGS`. The settings UI in [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) renders the same fields, grouped into four logical sections.
 
 ## Field reference
 
-### Provider selection
+### LLM connections
 
-| Field | Type | Default | Used by |
-|---|---|---|---|
-| `llmProvider` | `"copilot" \| "claude" \| "claude-proxy" \| "gemini" \| "cli"` | `"copilot"` | [llmClient.ts:264](../../src/core/llmClient.ts:264) factory; [insertResult.ts:21](../../src/commands/insertResult.ts:21) validator |
-| `llmModel` | `string` | `""` | Each provider client; falls back to provider-specific defaults except `claude-proxy` which throws |
-| `timeoutMs` | `number` | `60000` | [llmClient.ts:201](../../src/core/llmClient.ts:201) `CliClient` only |
+The plugin stores a list of named LLM connections rather than a single active provider. The active connection for a command is chosen by the default selection or overridden per-template with `ai-llm`.
 
-Provider-specific defaults inside the clients (used when `llmModel` is empty):
+| Field | Type | Default |
+|---|---|---|
+| `connections` | `LlmConnection[]` | One Copilot connection |
+| `defaultConnectionId` | `string` | ID of the first connection |
+| `timeoutMs` | `number` | `60000` |
 
-- `CopilotClient` → `gpt-4.1-mini` ([llmClient.ts:26](../../src/core/llmClient.ts:26))
-- `ClaudeClient` → `claude-sonnet-4-20250514` ([llmClient.ts:60](../../src/core/llmClient.ts:60))
-- `GeminiClient` → `gemini-2.0-flash` ([llmClient.ts:144](../../src/core/llmClient.ts:144))
-- `ClaudeProxyClient` → throws an error if empty ([llmClient.ts:102](../../src/core/llmClient.ts:102))
+#### `LlmConnection` shape
 
-### Credentials per provider
+```ts
+interface LlmConnection {
+  id: string;           // stable random identifier, never changes
+  name: string;         // user-facing label; referenced in templates as ai-llm: <name>
+  provider: LlmProvider; // "copilot" | "claude" | "claude-proxy" | "gemini" | "cli"
+  model: string;        // empty = use provider default
+  baseUrl: string;      // API base URL; empty = use provider default
+  apiKey: string;       // API key or Bearer token; unused by CLI
+  cliCommand: string;   // binary name or path; CLI only
+  cliArgs: string;      // space-separated extra args; CLI only
+  cliCwd: string;       // override working directory; CLI only, empty = inherit
+}
+```
 
-| Provider | Fields |
+**`id`** is assigned once (via `generateConnectionId`) and never changed. It is the stable key for `defaultConnectionId`.
+
+**`name`** must be non-empty and unique across all connections (case-insensitive comparison). It is the value used in `ai-llm:` frontmatter.
+
+**Provider-specific defaults** inside the clients (used when `model` is empty):
+
+- `CopilotClient` → `gpt-4.1-mini`
+- `ClaudeClient` → `claude-sonnet-4-20250514`
+- `GeminiClient` → `gemini-2.0-flash`
+- `ClaudeProxyClient` → throws if `model` is empty
+
+**Credential requirements per provider:**
+
+| Provider | Required fields |
 |---|---|
-| Copilot | `copilotApiBaseUrl`, `copilotApiKey` |
-| Claude | `claudeApiBaseUrl` (defaults to `https://api.anthropic.com`), `claudeApiKey` |
-| Claude proxy | `claudeProxyApiBaseUrl`, `claudeProxyApiKey` |
-| Gemini | `geminiApiBaseUrl` (defaults to `https://generativelanguage.googleapis.com`), `geminiApiKey` |
-| CLI | `cliCommand` (default `"claude"`), `cliArgs`, `cliCwd` |
-
-All credential strings default to `""`. The Claude and Gemini base URLs are special-cased — the client substitutes the public default when the field is empty, which is why both can validate as missing-only-if-non-http (see [providerValidation.ts](../../src/core/providerValidation.ts)).
+| Copilot | `baseUrl`, `apiKey` |
+| Claude | `apiKey` (`baseUrl` defaults to `https://api.anthropic.com`) |
+| Claude proxy | `baseUrl`, `apiKey` |
+| Gemini | `apiKey` (`baseUrl` defaults to `https://generativelanguage.googleapis.com`) |
+| CLI | `cliCommand` |
 
 ### Prompt configuration
 
@@ -51,19 +71,21 @@ All credential strings default to `""`. The Claude and Gemini base URLs are spec
 
 | Field | Type | Default | Used by |
 |---|---|---|---|
-| `llmResultHeading` | `string` | `"AI Result"` | [insertResult.ts:147](../../src/commands/insertResult.ts:147) — empty string disables the heading |
-| `insertPosition` | `"at-cursor" \| "after-selection" \| "end-of-file"` | `"after-selection"` | [insertResult.ts:152](../../src/commands/insertResult.ts:152) |
-| `debug` | `boolean` | `false` | [insertResult.ts:134](../../src/commands/insertResult.ts:134) |
+| `llmResultHeading` | `string` | `"AI Result"` | [insertResult.ts](../../src/commands/insertResult.ts) — empty string disables the heading |
+| `insertPosition` | `"at-cursor" \| "after-selection" \| "end-of-file"` | `"after-selection"` | [insertResult.ts](../../src/commands/insertResult.ts) |
+| `debug` | `boolean` | `false` | [insertResult.ts](../../src/commands/insertResult.ts) |
 
 ## Persistence
 
-[src/main.ts:15](../../src/main.ts:15)
+[src/main.ts](../../src/main.ts)
 
 ```ts
 async loadSettings() {
-  const saved = await this.loadData();
-  this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
-  // ... legacy migration
+  const saved = await this.loadData() as Record<string, unknown> | null;
+  const needsMigration = saved != null && ("llmProvider" in saved || "llmPromptMode" in saved);
+  const migrated = migrateSettings(saved);
+  this.settings = Object.assign({}, DEFAULT_SETTINGS, migrated);
+  if (needsMigration) await this.saveSettings();
 }
 
 async saveSettings() {
@@ -71,20 +93,21 @@ async saveSettings() {
 }
 ```
 
-- `loadData` / `saveData` are Obsidian's plugin-scoped persistence (one JSON file per plugin under `<vault>/.obsidian/plugins/<id>/data.json`).
+- `loadData` / `saveData` are Obsidian's plugin-scoped persistence (`<vault>/.obsidian/plugins/<id>/data.json`).
 - The merge is shallow; arrays and objects are replaced wholesale.
 - Every settings-tab change calls `await plugin.saveSettings()` immediately, so there is no in-memory dirty state.
 
 ## Migration
 
-Migrations run during `loadSettings` ([src/main.ts](../../src/main.ts)) and persist the corrected value immediately with `await this.saveSettings()`.
+Migrations run in `migrateSettings` ([src/core/settingsMigration.ts](../../src/core/settingsMigration.ts)) and are applied during `loadSettings`. If migration is needed the corrected value is persisted immediately.
 
 | When added | What it does |
 |---|---|
 | Initial | Removes the legacy `llmPromptMode` field (`"none" \| "inline" \| "picker"`). Prompt mode is now command-driven: **Ask AI** always uses the inline prompt, **Ask AI with template** always opens the picker. |
+| Multiple connections | Removes the legacy flat provider/credential fields (`llmProvider`, `llmModel`, `copilotApiBaseUrl`, `copilotApiKey`, `claudeApiBaseUrl`, `claudeApiKey`, `claudeProxyApiBaseUrl`, `claudeProxyApiKey`, `geminiApiBaseUrl`, `geminiApiKey`, `cliCommand`, `cliArgs`, `cliCwd`) and builds one `LlmConnection` named `"Default"` from them. |
 
-New migrations should follow the same shape: detect the legacy value, apply the correction, and save.
+New migrations follow the same shape: detect the legacy value, apply the correction, return the corrected object.
 
 ## Per-run overrides
 
-The `llmProvider`, `llmModel`, `llmResultHeading`, `insertPosition`, `debug`, `llmIncludeInlineSystemPrompt`, `includeVaultNoteNames`, and `includeNoteAliases` fields can be overridden on a per-invocation basis by the **Ask AI with template** command via `ai-*` YAML properties in the template's frontmatter. The override is applied to a shallow clone of `settings` — global settings are never mutated. See [Template overrides](../03-features/template-overrides.md).
+The `ai-llm` and `ai-model` frontmatter keys in a template select a connection by name and override its model for one run. The `llmResultHeading`, `insertPosition`, `debug`, `llmIncludeInlineSystemPrompt`, `includeVaultNoteNames`, and `includeNoteAliases` fields can also be overridden. The override is applied to a shallow clone of `settings` — global settings are never mutated. See [Template overrides](../03-features/template-overrides.md).

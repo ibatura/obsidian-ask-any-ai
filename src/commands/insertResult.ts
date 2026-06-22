@@ -1,9 +1,9 @@
 import { App, Editor, Notice, TFile } from "obsidian";
-import { AiAssistantSettings } from "../settings";
+import { AiAssistantSettings, LlmConnection } from "../settings";
 import { resolveInlinePrompt } from "../core/promptResolver";
 import { expandObsidianLinks } from "../core/linkResolver";
 import { buildNoteNamesBlock } from "../core/noteNamesContext";
-import { validateProviderSettings } from "../core/providerValidation";
+import { resolveConnection } from "../core/connectionResolver";
 import { parseTemplateOverrides, applyOverrides, stripFrontmatter } from "../core/templateOverrides";
 import { createLlmClient } from "../core/llmClient";
 import { PromptPickerModal } from "../ui/promptPickerModal";
@@ -21,6 +21,7 @@ async function runRequest(
   file: TFile,
   app: App,
   settings: AiAssistantSettings,
+  connection: LlmConnection,
   rawInput: string,
   systemPrompt: string,
 ): Promise<void> {
@@ -42,21 +43,9 @@ async function runRequest(
       resolvedSystemPrompt = resolvedSystemPrompt ? `${resolvedSystemPrompt}\n\n${noteBlock}` : noteBlock;
     }
 
-    // Step 3: Validate provider
-    const validationError = validateProviderSettings(settings);
-    if (validationError) {
-      progress.close();
-      new Notice(validationError);
-      return;
-    }
-
-    // Step 4: Call LLM
-    const PROVIDER_LABELS: Record<string, string> = {
-      copilot: "Copilot", claude: "Claude", "claude-proxy": "Claude (proxy)", gemini: "Gemini", cli: "CLI",
-    };
-    const providerLabel = PROVIDER_LABELS[settings.llmProvider] ?? settings.llmProvider;
-    progress.updateStatus(`Sending to ${providerLabel}...`, 30);
-    const client = createLlmClient(settings);
+    // Step 3: Call LLM
+    progress.updateStatus(`Sending to ${connection.name}...`, 30);
+    const client = createLlmClient(connection, settings.timeoutMs);
     progress.updateStatus("Waiting for response...", 50);
     const result = await client.generateResult({ systemPrompt: resolvedSystemPrompt, userContent: expanded });
 
@@ -66,19 +55,20 @@ async function runRequest(
       return;
     }
 
-    // Step 5: Insert result
+    // Step 4: Insert result
     progress.updateStatus("Processing response...", 85);
 
     let block = "\n\n";
 
     if (settings.debug) {
-      const model = settings.llmModel.trim() || "(default)";
+      const model = connection.model.trim() || "(default)";
       const systemBlock = resolvedSystemPrompt.trim()
         ? "```text\n" + resolvedSystemPrompt + "\n```"
         : "_(empty)_";
       block +=
         `## AI Request (debug)\n\n` +
-        `**Provider:** ${settings.llmProvider}\n` +
+        `**Connection:** ${connection.name}\n` +
+        `**Provider:** ${connection.provider}\n` +
         `**Model:** ${model}\n\n` +
         `### System prompt\n\n${systemBlock}\n\n` +
         `### User content\n\n\`\`\`text\n${expanded}\n\`\`\`\n\n`;
@@ -130,8 +120,14 @@ export async function insertLlmResultRaw(
     return;
   }
 
+  const { connection, warnings } = resolveConnection(settings, {});
+  if (warnings.length > 0) {
+    new Notice(warnings.map((w) => `• ${w}`).join("\n"));
+  }
+  if (!connection) return;
+
   const systemPrompt = resolveInlinePrompt(settings);
-  await runRequest(editor, file, app, settings, rawInput, systemPrompt);
+  await runRequest(editor, file, app, settings, connection, rawInput, systemPrompt);
 }
 
 /**
@@ -169,16 +165,19 @@ export async function insertLlmResultWithTemplate(
 
   // Parse template frontmatter overrides
   const cache = picked ? app.metadataCache.getFileCache(picked) : null;
-  const { overrides, warnings: parseWarnings } = parseTemplateOverrides(cache?.frontmatter ?? null);
+  const { overrides, llmName, modelOverride, warnings: parseWarnings } = parseTemplateOverrides(cache?.frontmatter ?? null);
   const { effective: effectiveSettings, warnings: applyWarnings } = applyOverrides(settings, overrides);
-  const allWarnings = [...parseWarnings, ...applyWarnings];
+  const { connection, warnings: resolveWarnings } = resolveConnection(effectiveSettings, { llmName, modelOverride });
 
+  const allWarnings = [...parseWarnings, ...applyWarnings, ...resolveWarnings];
   if (allWarnings.length > 0) {
     new Notice(
       `Template override warnings:\n${allWarnings.map((w) => `• ${w}`).join("\n")}`
     );
     console.warn("[ai-assistant] Template override warnings:", allWarnings);
   }
+
+  if (!connection) return;
 
   // Read template and strip frontmatter
   const rawContent = picked ? await app.vault.read(picked) : "";
@@ -190,5 +189,5 @@ export async function insertLlmResultWithTemplate(
     ? `${inlinePrompt}\n\n${templateContent}`
     : templateContent;
 
-  await runRequest(editor, file, app, effectiveSettings, rawInput, systemPrompt);
+  await runRequest(editor, file, app, effectiveSettings, connection, rawInput, systemPrompt);
 }

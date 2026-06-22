@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_SETTINGS } from "./settings";
 
 describe("Settings Defaults", () => {
-  it("should have copilot as the default provider", () => {
-    expect(DEFAULT_SETTINGS.llmProvider).toBe("copilot");
+  it("should have one default connection", () => {
+    expect(DEFAULT_SETTINGS.connections).toHaveLength(1);
+    expect(DEFAULT_SETTINGS.connections[0].provider).toBe("copilot");
   });
 
   it("should default the fallback prompt correctly", () => {
@@ -14,9 +15,8 @@ describe("Settings Defaults", () => {
     expect(DEFAULT_SETTINGS.insertPosition).toBe("after-selection");
   });
 
-  it("should expose the correct provider options", () => {
-    const providers: Array<typeof DEFAULT_SETTINGS.llmProvider> = ["copilot", "claude", "gemini", "cli"];
-    expect(providers).toContain(DEFAULT_SETTINGS.llmProvider);
+  it("should have defaultConnectionId matching the first connection", () => {
+    expect(DEFAULT_SETTINGS.defaultConnectionId).toBe(DEFAULT_SETTINGS.connections[0].id);
   });
 
   it("should default llmIncludeInlineSystemPrompt to true", () => {

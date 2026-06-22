@@ -6,16 +6,16 @@ The **Ask AI with template** command lets each template `.md` file carry its own
 
 Add any of these to a template's frontmatter:
 
-| Frontmatter key | Maps to setting | Accepted values |
+| Frontmatter key | Effect | Accepted values |
 |---|---|---|
-| `ai-provider` | `llmProvider` | `copilot`, `claude`, `claude-proxy`, `gemini`, `cli` |
-| `ai-model` | `llmModel` | Any non-empty string |
-| `ai-result-heading` | `llmResultHeading` | Any string (empty string disables the heading) |
-| `ai-insert-position` | `insertPosition` | `after-selection`, `at-cursor`, `end-of-file` |
-| `ai-debug` | `debug` | `true` or `false` |
-| `ai-include-inline-prompt` | `llmIncludeInlineSystemPrompt` | `true` or `false` |
-| `ai-include-note-names` | `includeVaultNoteNames` | `true` or `false` |
-| `ai-include-note-aliases` | `includeNoteAliases` | `true` or `false` |
+| `ai-llm` | Select a connection by name for this run | Any configured connection name (case-insensitive) |
+| `ai-model` | Override the model of the selected connection | Any non-empty string |
+| `ai-result-heading` | Maps to `llmResultHeading` | Any string (empty disables the heading) |
+| `ai-insert-position` | Maps to `insertPosition` | `after-selection`, `at-cursor`, `end-of-file` |
+| `ai-debug` | Maps to `debug` | `true` or `false` |
+| `ai-include-inline-prompt` | Maps to `llmIncludeInlineSystemPrompt` | `true` or `false` |
+| `ai-include-note-names` | Maps to `includeVaultNoteNames` | `true` or `false` |
+| `ai-include-note-aliases` | Maps to `includeNoteAliases` | `true` or `false` |
 
 Any `ai-` key not in this table is warned about and ignored.
 
@@ -23,7 +23,7 @@ Any `ai-` key not in this table is warned about and ignored.
 
 ```yaml
 ---
-ai-provider: claude
+ai-llm: Work Claude
 ai-model: claude-haiku-4-5-20251001
 ai-result-heading: Translation
 ai-insert-position: end-of-file
@@ -33,18 +33,21 @@ ai-include-note-aliases: true
 You are a professional translator. Translate the following text to French.
 ```
 
-## Validation and warn-and-fall-back
+`ai-llm: Work Claude` selects the connection named "Work Claude" for this run. `ai-model` overrides its model; the connection's credentials are still used.
 
-Overrides are validated field-by-field. An invalid value produces a single warning and leaves the global value intact; other fields are still applied. All warnings for a run are shown in a single Obsidian `Notice` and logged to the console.
+## Validation and warn-and-fall-back
 
 | Condition | Behaviour |
 |---|---|
-| `ai-provider` has an unrecognised value | Warn; global provider and model are kept |
+| `ai-llm` names a connection that does not exist | Warn "connection X not configured — using default"; default connection is used |
+| `ai-llm` names a connection whose credentials are incomplete | Warn "connection X misconfigured — falling back to default"; default is used |
 | `ai-insert-position` has an unrecognised value | Warn; global insert position is kept |
 | Boolean key (`ai-debug`, `ai-include-inline-prompt`, etc.) has a non-boolean value | Warn; global value is kept |
-| `ai-provider` (or `ai-model`) overrides to a provider that has no configured credentials | Warn "no configured credentials — reverting to global provider"; provider and model are both reverted to the global values |
+| `ai-provider` (deprecated key) | Warn "Unknown template property: ai-provider"; ignored |
 | Unknown `ai-*` key | Warn; ignored |
 | Non-`ai-*` key | Silently ignored |
+
+All warnings for a run are shown in a single Obsidian `Notice` and logged to the console.
 
 ## Effective-settings merge
 
@@ -53,7 +56,7 @@ Overrides are validated field-by-field. An invalid value produces a single warni
 const effective: AiAssistantSettings = { ...global, ...overrides };
 ```
 
-`applyOverrides` shallow-clones `global` and spreads `overrides` over it. The result is an `AiAssistantSettings` that is used for one invocation only. If credentials validation fails for an overridden provider, `effective.llmProvider` and `effective.llmModel` are both reset to `global.llmProvider` / `global.llmModel` in-place.
+`applyOverrides` shallow-clones `global` and spreads `overrides` over it. The result is an `AiAssistantSettings` used for one invocation only. Connection resolution (`resolveConnection`) runs afterward with the `llmName` and `modelOverride` parsed from frontmatter.
 
 ## Frontmatter stripping
 
@@ -64,6 +67,7 @@ The template body sent to the model is the file content **after** the frontmatte
 | File | Purpose |
 |---|---|
 | [src/core/templateOverrides.ts](../../src/core/templateOverrides.ts) | `parseTemplateOverrides`, `applyOverrides`, `stripFrontmatter` |
-| [src/core/providerValidation.ts](../../src/core/providerValidation.ts) | `validateProviderSettings` — shared credential check used by both `applyOverrides` and `insertResult.ts` |
-| [src/commands/insertResult.ts](../../src/commands/insertResult.ts) | `insertLlmResultWithTemplate` — wires picker → parse → apply → strip → request |
+| [src/core/connectionResolver.ts](../../src/core/connectionResolver.ts) | `resolveConnection` — picks connection by name or default, validates, warns and falls back |
+| [src/core/providerValidation.ts](../../src/core/providerValidation.ts) | `validateConnection` — checks credentials for a single `LlmConnection` |
+| [src/commands/insertResult.ts](../../src/commands/insertResult.ts) | `insertLlmResultWithTemplate` — wires picker → parse → apply → resolve connection → strip → request |
 | [src/core/templateOverrides.test.ts](../../src/core/templateOverrides.test.ts) | Unit tests for all three functions |

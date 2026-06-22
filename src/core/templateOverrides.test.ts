@@ -4,24 +4,29 @@ import {
   applyOverrides,
   stripFrontmatter,
 } from "./templateOverrides";
-import { AiAssistantSettings } from "../settings";
+import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
 
-function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+function makeConn(overrides: Partial<LlmConnection> = {}): LlmConnection {
   return {
-    llmProvider: "copilot",
-    llmModel: "gpt-4.1-mini",
-    timeoutMs: 60000,
-    copilotApiBaseUrl: "https://api.githubcopilot.com",
-    copilotApiKey: "tok-123",
-    claudeApiBaseUrl: "",
-    claudeApiKey: "",
-    claudeProxyApiBaseUrl: "",
-    claudeProxyApiKey: "",
-    geminiApiBaseUrl: "",
-    geminiApiKey: "",
+    id: generateConnectionId(),
+    name: "Default",
+    provider: "cli",
+    model: "",
+    baseUrl: "",
+    apiKey: "",
     cliCommand: "echo",
     cliArgs: "",
     cliCwd: "",
+    ...overrides,
+  };
+}
+
+function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+  const conn = makeConn();
+  return {
+    connections: [conn],
+    defaultConnectionId: conn.id,
+    timeoutMs: 60000,
     llmInlinePrompt: "You are an assistant.",
     llmIncludeInlineSystemPrompt: true,
     llmPromptsFolder: "Prompts/AI",
@@ -57,9 +62,9 @@ describe("parseTemplateOverrides", () => {
   });
 
   it("parses a fully valid override set", () => {
-    const { overrides, warnings } = parseTemplateOverrides({
+    const { overrides, llmName, modelOverride, warnings } = parseTemplateOverrides({
+      "ai-llm": "Work Claude",
       "ai-model": "claude-sonnet-4-20250514",
-      "ai-provider": "claude",
       "ai-result-heading": "Translation",
       "ai-insert-position": "end-of-file",
       "ai-debug": true,
@@ -69,9 +74,9 @@ describe("parseTemplateOverrides", () => {
     });
 
     expect(warnings).toHaveLength(0);
+    expect(llmName).toBe("Work Claude");
+    expect(modelOverride).toBe("claude-sonnet-4-20250514");
     expect(overrides).toEqual({
-      llmModel: "claude-sonnet-4-20250514",
-      llmProvider: "claude",
       llmResultHeading: "Translation",
       insertPosition: "end-of-file",
       debug: true,
@@ -87,11 +92,30 @@ describe("parseTemplateOverrides", () => {
     expect(overrides.llmResultHeading).toBe("");
   });
 
-  it("warns and omits invalid ai-provider value", () => {
-    const { overrides, warnings } = parseTemplateOverrides({ "ai-provider": "openai" });
+  it("surfaces ai-llm as llmName", () => {
+    const { llmName, warnings } = parseTemplateOverrides({ "ai-llm": "My Connection" });
+    expect(warnings).toHaveLength(0);
+    expect(llmName).toBe("My Connection");
+  });
+
+  it("warns and omits empty ai-llm value", () => {
+    const { llmName, warnings } = parseTemplateOverrides({ "ai-llm": "   " });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('"ai-llm"');
+    expect(llmName).toBeUndefined();
+  });
+
+  it("surfaces ai-model as modelOverride", () => {
+    const { modelOverride, warnings } = parseTemplateOverrides({ "ai-model": "gpt-4o" });
+    expect(warnings).toHaveLength(0);
+    expect(modelOverride).toBe("gpt-4o");
+  });
+
+  it("warns about ai-provider as an unknown key", () => {
+    const { overrides, warnings } = parseTemplateOverrides({ "ai-provider": "claude" });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('"ai-provider"');
-    expect(overrides.llmProvider).toBeUndefined();
+    expect(Object.keys(overrides)).toHaveLength(0);
   });
 
   it("warns and omits invalid ai-insert-position value", () => {
@@ -129,10 +153,10 @@ describe("parseTemplateOverrides", () => {
 
   it("accumulates multiple warnings in one call", () => {
     const { overrides, warnings } = parseTemplateOverrides({
-      "ai-provider": "openai",
-      "ai-insert-position": "top",
-      "ai-debug": "yes",
-      "ai-unknown-key": "foo",
+      "ai-provider": "claude",       // unknown key → warning
+      "ai-insert-position": "top",   // invalid value → warning
+      "ai-debug": "yes",             // non-boolean → warning
+      "ai-unknown-key": "foo",       // unknown key → warning
     });
     expect(warnings).toHaveLength(4);
     expect(Object.keys(overrides)).toHaveLength(0);
@@ -168,46 +192,14 @@ describe("applyOverrides", () => {
     expect(effective.insertPosition).toBe("end-of-file");
     expect(effective.debug).toBe(true);
     expect(effective.llmResultHeading).toBe("Translation");
-    expect(effective.llmProvider).toBe("copilot"); // unchanged
+    expect(effective.connections).toBe(global.connections); // connections untouched
   });
 
-  it("applies provider override when credentials are present", () => {
-    const global = makeSettings({ claudeApiKey: "sk-ant-123" });
-    const { effective, warnings } = applyOverrides(global, {
-      llmProvider: "claude",
-      llmModel: "claude-haiku-4-5-20251001",
-    });
-    expect(warnings).toHaveLength(0);
-    expect(effective.llmProvider).toBe("claude");
-    expect(effective.llmModel).toBe("claude-haiku-4-5-20251001");
-  });
-
-  it("reverts provider and model when credentials are missing", () => {
-    const global = makeSettings({ llmProvider: "copilot", copilotApiKey: "tok-123", copilotApiBaseUrl: "https://api.githubcopilot.com" });
-    const { effective, warnings } = applyOverrides(global, {
-      llmProvider: "claude",
-      llmModel: "claude-sonnet-4",
-    });
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("no configured credentials");
-    expect(effective.llmProvider).toBe("copilot");
-    expect(effective.llmModel).toBe("gpt-4.1-mini");
-  });
-
-  it("reverts model too when only model is overridden but effective provider has no credentials", () => {
-    // Override model for a provider that currently has no creds set up
-    const global = makeSettings({ llmProvider: "claude", claudeApiKey: "" });
-    const { effective, warnings } = applyOverrides(global, { llmModel: "claude-opus-4-8" });
-    expect(warnings).toHaveLength(1);
-    expect(effective.llmModel).toBe("gpt-4.1-mini"); // reverted to global
-  });
-
-  it("allows overriding model alone when effective provider has credentials", () => {
-    const global = makeSettings({ claudeApiKey: "sk-ant-123", llmProvider: "claude" });
-    const { effective, warnings } = applyOverrides(global, { llmModel: "claude-haiku-4-5-20251001" });
-    expect(warnings).toHaveLength(0);
-    expect(effective.llmModel).toBe("claude-haiku-4-5-20251001");
-    expect(effective.llmProvider).toBe("claude");
+  it("preserves connections and defaultConnectionId unchanged", () => {
+    const global = makeSettings();
+    const { effective } = applyOverrides(global, { llmResultHeading: "New Heading" });
+    expect(effective.connections).toBe(global.connections);
+    expect(effective.defaultConnectionId).toBe(global.defaultConnectionId);
   });
 });
 
@@ -222,12 +214,8 @@ describe("stripFrontmatter", () => {
 
   it("strips frontmatter using the provided end offset", () => {
     // "---\nai-model: foo\n---\nBody content"
-    //  0123456789...
     const content = "---\nai-model: foo\n---\nBody content";
-    // "---" is at 18..20, so offset of end of "---" closing is 21 (the \n follows at 21)
-    // Let's compute: "---\nai-model: foo\n---" = 3+1+14+1+3 = 22 chars, indices 0-21
-    // end.offset = 22 means we slice from index 22
-    const fmEnd = "---\nai-model: foo\n---".length; // 22
+    const fmEnd = "---\nai-model: foo\n---".length;
     expect(stripFrontmatter(content, { end: { offset: fmEnd } })).toBe("Body content");
   });
 

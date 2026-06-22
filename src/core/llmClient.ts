@@ -1,4 +1,4 @@
-import { AiAssistantSettings } from "../settings";
+import { LlmConnection } from "../settings";
 import { requestUrl } from "obsidian";
 import { spawn } from "child_process";
 
@@ -11,74 +11,60 @@ export interface LlmClient {
   generateResult(req: LlmRequest): Promise<string>;
 }
 
-/**
- * Copilot client — targets an OpenAI-compatible /v1/chat/completions endpoint
- * (e.g. GitHub Copilot proxy or any OpenAI-compatible service).
- */
 export class CopilotClient implements LlmClient {
-  constructor(private settings: AiAssistantSettings) {}
+  constructor(private connection: LlmConnection) {}
 
   async generateResult(req: LlmRequest): Promise<string> {
-    const baseUrl = this.settings.copilotApiBaseUrl.replace(/\/+$/, "");
+    const baseUrl = this.connection.baseUrl.replace(/\/+$/, "");
     const url = `${baseUrl}/v1/chat/completions`;
-
     const body = {
-      model: this.settings.llmModel || "gpt-4.1-mini",
+      model: this.connection.model || "gpt-4.1-mini",
       messages: [
         { role: "system", content: req.systemPrompt },
         { role: "user", content: req.userContent },
       ],
     };
-
     const response = await requestUrl({
       url,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.copilotApiKey}`,
+        Authorization: `Bearer ${this.connection.apiKey}`,
       },
       body: JSON.stringify(body),
       throw: true,
     });
-
     const data = response.json;
     return data?.choices?.[0]?.message?.content?.trim() ?? "";
   }
 }
 
-/**
- * Claude client — uses the Anthropic Messages API.
- */
 export class ClaudeClient implements LlmClient {
-  constructor(private settings: AiAssistantSettings) {}
+  constructor(private connection: LlmConnection) {}
 
   async generateResult(req: LlmRequest): Promise<string> {
-    const baseUrl = (this.settings.claudeApiBaseUrl || "https://api.anthropic.com").replace(/\/+$/, "");
+    const baseUrl = (this.connection.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "");
     const url = `${baseUrl}/v1/messages`;
-
     const body = {
-      model: this.settings.llmModel || "claude-sonnet-4-20250514",
+      model: this.connection.model || "claude-sonnet-4-20250514",
       max_tokens: 4096,
       system: req.systemPrompt,
       messages: [
         { role: "user", content: req.userContent },
       ],
     };
-
     const response = await requestUrl({
       url,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": this.settings.claudeApiKey,
+        "x-api-key": this.connection.apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(body),
       throw: true,
     });
-
     const data = response.json;
-    // Anthropic returns content as an array of blocks
     const blocks = data?.content;
     if (Array.isArray(blocks)) {
       return blocks
@@ -91,63 +77,48 @@ export class ClaudeClient implements LlmClient {
   }
 }
 
-/**
- * Claude proxy client — calls Claude through any OpenAI-compatible /v1/chat/completions
- * endpoint (e.g. OpenRouter, Together, an internal gateway) using Bearer auth.
- */
 export class ClaudeProxyClient implements LlmClient {
-  constructor(private settings: AiAssistantSettings) {}
+  constructor(private connection: LlmConnection) {}
 
   async generateResult(req: LlmRequest): Promise<string> {
-    if (!this.settings.llmModel.trim()) {
+    if (!this.connection.model.trim()) {
       throw new Error(
         "Set a model ID for the Claude proxy provider " +
         "(e.g. anthropic/claude-3.7-sonnet for OpenRouter)."
       );
     }
-
-    const baseUrl = this.settings.claudeProxyApiBaseUrl.replace(/\/+$/, "");
+    const baseUrl = this.connection.baseUrl.replace(/\/+$/, "");
     const url = `${baseUrl}/v1/chat/completions`;
-
     const body = {
-      model: this.settings.llmModel,
+      model: this.connection.model,
       messages: [
         { role: "system", content: req.systemPrompt },
         { role: "user", content: req.userContent },
       ],
     };
-
     const response = await requestUrl({
       url,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.claudeProxyApiKey}`,
+        Authorization: `Bearer ${this.connection.apiKey}`,
       },
       body: JSON.stringify(body),
       throw: true,
     });
-
     const data = response.json;
     return data?.choices?.[0]?.message?.content?.trim() ?? "";
   }
 }
 
-/**
- * Gemini client — uses the Gemini generateContent endpoint.
- */
 export class GeminiClient implements LlmClient {
-  constructor(private settings: AiAssistantSettings) {}
+  constructor(private connection: LlmConnection) {}
 
   async generateResult(req: LlmRequest): Promise<string> {
-    const baseUrl = (this.settings.geminiApiBaseUrl || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
-    const model = this.settings.llmModel || "gemini-2.0-flash";
-    const url = `${baseUrl}/v1beta/models/${model}:generateContent?key=${this.settings.geminiApiKey}`;
-
-    const body = {
-      system_instruction: {
-        parts: [{ text: req.systemPrompt }],
-      },
+    const baseUrl = (this.connection.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
+    const model = this.connection.model || "gemini-2.5-flash";
+    const url = `${baseUrl}/v1beta/models/${model}:generateContent?key=${this.connection.apiKey}`;
+const body: Record<string, unknown> = {
       contents: [
         {
           role: "user",
@@ -155,7 +126,9 @@ export class GeminiClient implements LlmClient {
         },
       ],
     };
-
+    if (req.systemPrompt) {
+      body.system_instruction = { parts: [{ text: req.systemPrompt }] };
+    }
     const response = await requestUrl({
       url,
       method: "POST",
@@ -165,7 +138,6 @@ export class GeminiClient implements LlmClient {
       body: JSON.stringify(body),
       throw: true,
     });
-
     const data = response.json;
     const parts = data?.candidates?.[0]?.content?.parts;
     if (Array.isArray(parts)) {
@@ -175,30 +147,22 @@ export class GeminiClient implements LlmClient {
   }
 }
 
-/**
- * CLI client — spawns a local CLI tool (e.g., `claude`, `gemini`, `llm`) and
- * pipes the combined system+user prompt to stdin. Captures stdout as the result.
- *
- * Requires the plugin to run in a Node-enabled context (isDesktopOnly: true).
- */
 export class CliClient implements LlmClient {
-  constructor(private settings: AiAssistantSettings) {}
+  constructor(private connection: LlmConnection, private timeoutMs: number) {}
 
   async generateResult(req: LlmRequest): Promise<string> {
-    const command = (this.settings.cliCommand || "").trim();
+    const command = (this.connection.cliCommand || "").trim();
     if (!command) {
       throw new Error("CLI command is not configured");
     }
 
-    // Naive whitespace split for args. For complex quoting, users can use a
-    // wrapper script. This keeps the implementation simple and predictable.
-    const args = (this.settings.cliArgs || "")
+    const args = (this.connection.cliArgs || "")
       .trim()
       .split(/\s+/)
       .filter((s) => s.length > 0);
 
-    const cwd = (this.settings.cliCwd || "").trim() || undefined;
-    const timeoutMs = this.settings.timeoutMs || 60000;
+    const cwd = (this.connection.cliCwd || "").trim() || undefined;
+    const timeoutMs = this.timeoutMs || 60000;
 
     const stdinPayload = req.systemPrompt
       ? `${req.systemPrompt}\n\n${req.userContent}`
@@ -222,12 +186,8 @@ export class CliClient implements LlmClient {
         reject(new Error(`CLI command timed out after ${timeoutMs}ms: ${command}`));
       }, timeoutMs);
 
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString("utf8");
-      });
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString("utf8");
-      });
+      child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); });
+      child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8"); });
 
       child.on("error", (err: Error) => {
         if (settled) return;
@@ -261,20 +221,15 @@ export class CliClient implements LlmClient {
   }
 }
 
-export function createLlmClient(settings: AiAssistantSettings): LlmClient {
-  switch (settings.llmProvider) {
-    case "copilot":
-      return new CopilotClient(settings);
-    case "claude":
-      return new ClaudeClient(settings);
-    case "claude-proxy":
-      return new ClaudeProxyClient(settings);
-    case "gemini":
-      return new GeminiClient(settings);
-    case "cli":
-      return new CliClient(settings);
+export function createLlmClient(connection: LlmConnection, timeoutMs: number): LlmClient {
+  switch (connection.provider) {
+    case "copilot": return new CopilotClient(connection);
+    case "claude": return new ClaudeClient(connection);
+    case "claude-proxy": return new ClaudeProxyClient(connection);
+    case "gemini": return new GeminiClient(connection);
+    case "cli": return new CliClient(connection, timeoutMs);
     default: {
-      const _exhaustive: never = settings.llmProvider;
+      const _exhaustive: never = connection.provider;
       throw new Error(`Unknown LLM provider: ${String(_exhaustive)}`);
     }
   }

@@ -1,6 +1,6 @@
 # LLM providers
 
-Five concrete providers implement the `LlmClient` interface defined in [src/core/llmClient.ts](../../src/core/llmClient.ts). The factory `createLlmClient` ([llmClient.ts:264](../../src/core/llmClient.ts:264)) maps `settings.llmProvider` to the correct class.
+Five concrete providers implement the `LlmClient` interface defined in [src/core/llmClient.ts](../../src/core/llmClient.ts). The factory `createLlmClient` ([llmClient.ts:264](../../src/core/llmClient.ts:264)) takes a `LlmConnection` and instantiates the correct class based on `connection.provider`.
 
 ## Provider matrix
 
@@ -31,7 +31,7 @@ All HTTP clients use Obsidian's `requestUrl` ([llmClient.ts:2](../../src/core/ll
 
 ```json
 {
-  "model": "<llmModel or gpt-4.1-mini>",
+  "model": "<connection.model or gpt-4.1-mini>",
   "messages": [
     { "role": "system", "content": "<systemPrompt>" },
     { "role": "user",   "content": "<userContent>" }
@@ -47,7 +47,7 @@ Response extraction: `data.choices[0].message.content.trim()` ([llmClient.ts:45]
 
 ```json
 {
-  "model": "<llmModel or claude-sonnet-4-20250514>",
+  "model": "<connection.model or claude-sonnet-4-20250514>",
   "max_tokens": 4096,
   "system": "<systemPrompt>",
   "messages": [
@@ -100,13 +100,13 @@ The `settled` flag at [llmClient.ts:208](../../src/core/llmClient.ts:208) guards
 [llmClient.ts:264](../../src/core/llmClient.ts:264)
 
 ```ts
-switch (settings.llmProvider) {
-  case "copilot":      return new CopilotClient(settings);
-  case "claude":       return new ClaudeClient(settings);
-  case "claude-proxy": return new ClaudeProxyClient(settings);
-  case "gemini":       return new GeminiClient(settings);
-  case "cli":          return new CliClient(settings);
-  default: { const _exhaustive: never = settings.llmProvider; throw ... }
+switch (connection.provider) {
+  case "copilot":      return new CopilotClient(connection, timeoutMs);
+  case "claude":       return new ClaudeClient(connection, timeoutMs);
+  case "claude-proxy": return new ClaudeProxyClient(connection, timeoutMs);
+  case "gemini":       return new GeminiClient(connection, timeoutMs);
+  case "cli":          return new CliClient(connection, timeoutMs);
+  default: { const _exhaustive: never = connection.provider; throw ... }
 }
 ```
 
@@ -114,7 +114,7 @@ The `_exhaustive: never` assignment forces a TypeScript error if `LlmProvider` e
 
 ## Validation (separate from clients)
 
-Credential and URL validation is centralised in `validateProviderSettings` at [insertResult.ts:20](../../src/commands/insertResult.ts:20). It runs *before* `createLlmClient` so the user sees a focused error message instead of a generic HTTP failure.
+Credential and URL validation is centralised in `validateConnection` at [src/core/providerValidation.ts](../../src/core/providerValidation.ts). It is called by `resolveConnection` before `createLlmClient` so the user sees a focused error message instead of a generic HTTP failure.
 
 | Provider | Validation rule |
 |---|---|

@@ -13,6 +13,8 @@ The system prompt comes entirely from the inline prompt setting. `resolveInlineP
 
 The toggle lets a user keep their inline prompt configured but temporarily suppress it without clearing it.
 
+Connection resolution runs before the LLM call: `resolveConnection(settings, {})` picks the default connection, runs `validateConnection`, and returns a `LlmConnection` or a list of warning strings if no valid connection is available.
+
 ## Ask AI with template
 
 [src/commands/insertResult.ts — `insertLlmResultWithTemplate`](../../src/commands/insertResult.ts)
@@ -32,7 +34,14 @@ Obsidian's default `SuggestModal` fires `onClose` before `onChooseSuggestion`, w
 
 ### Step 2 — Frontmatter overrides
 
-The template file's frontmatter is read via `app.metadataCache.getFileCache(picked)?.frontmatter`. Any `ai-*` keys found there are parsed and validated by `parseTemplateOverrides` and merged into a per-run clone of the global settings by `applyOverrides`. The global settings object is never mutated. See [Template overrides](template-overrides.md) for the full key table and fallback rules.
+The template file's frontmatter is read via `app.metadataCache.getFileCache(picked)?.frontmatter`. Any `ai-*` keys found there are parsed by `parseTemplateOverrides`, which returns:
+
+- `overrides: TemplateOverrides` — plain settings fields (`llmResultHeading`, `insertPosition`, etc.)
+- `llmName?: string` — from `ai-llm`, the name of the connection to use
+- `modelOverride?: string` — from `ai-model`, a model string to apply to the resolved connection
+- `warnings: string[]` — parse-time validation warnings
+
+`applyOverrides(settings, overrides)` merges the plain overrides into a per-run clone of global settings. The global settings object is never mutated. `resolveConnection(effectiveSettings, { llmName, modelOverride })` then selects and validates the connection. See [Template overrides](template-overrides.md) for the full key table and fallback rules.
 
 ### Step 3 — Frontmatter stripping
 
