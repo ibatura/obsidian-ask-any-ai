@@ -5,5 +5,6 @@
 	"minAppVersion": "1.5.0",
 	"description": "Use Copilot, Claude, Gemini, or a local CLI tool to generate AI results directly inside the current note.",
 	"author": "Ivan Batura",
+	"authorUrl": "https://github.com/ibatura/obsidian-ai-assistant/",
 	"isDesktopOnly": true
 }
