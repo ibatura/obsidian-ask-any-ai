@@ -1,6 +1,9 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type AiAssistantPlugin from "../main";
 import { LlmConnection, LlmProvider, generateConnectionId } from "../settings";
+import { validateConnection } from "../core/providerValidation";
+import { addSecretSetting } from "./secretField";
+import { TEMPLATE_PARAM_DOCS, buildExampleFrontmatter } from "./templateReference";
 
 const MODEL_PLACEHOLDERS: Record<LlmProvider, string> = {
   copilot: "e.g. gpt-4.1-mini",
@@ -10,8 +13,19 @@ const MODEL_PLACEHOLDERS: Record<LlmProvider, string> = {
   cli: "",
 };
 
+const PROVIDER_LABELS: Record<LlmProvider, string> = {
+  copilot: "Copilot",
+  claude: "Claude",
+  "claude-proxy": "Claude (proxy)",
+  gemini: "Gemini",
+  cli: "Local CLI",
+};
+
 export class AiAssistantSettingTab extends PluginSettingTab {
   plugin: AiAssistantPlugin;
+
+  /** Connection ids whose cards are currently expanded, preserved across display() re-renders. */
+  private expandedConnectionIds = new Set<string>();
 
   constructor(app: App, plugin: AiAssistantPlugin) {
     super(app, plugin);
@@ -29,8 +43,29 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const isDefault = conn.id === this.plugin.settings.defaultConnectionId;
 
+    // Collapsible card
+    const card = containerEl.createEl("details", { cls: "ai-conn-card" });
+    card.open = this.expandedConnectionIds.has(conn.id);
+    card.addEventListener("toggle", () => {
+      if (card.open) this.expandedConnectionIds.add(conn.id);
+      else this.expandedConnectionIds.delete(conn.id);
+    });
+
+    // Summary header: name · provider pill · default badge · warning
+    const summary = card.createEl("summary", { cls: "ai-conn-summary" });
+    const nameEl = summary.createEl("span", { cls: "ai-conn-name", text: conn.name });
+    summary.createEl("span", { cls: "ai-conn-pill", text: PROVIDER_LABELS[conn.provider] });
+    if (isDefault) {
+      summary.createEl("span", { cls: "ai-conn-badge", text: "★ Default" });
+    }
+    const validationError = validateConnection(conn);
+    if (validationError) {
+      const warn = summary.createEl("span", { cls: "ai-conn-warning", text: "⚠" });
+      warn.setAttr("title", validationError);
+    }
+
     // Name
-    new Setting(containerEl)
+    new Setting(card)
       .setName("Name")
       .setDesc(
         isDefault
@@ -57,13 +92,15 @@ export class AiAssistantSettingTab extends PluginSettingTab {
               return;
             }
             conn.name = trimmed;
+            nameEl.setText(trimmed);
             await this.plugin.saveSettings();
           })
       );
 
     // Provider
-    new Setting(containerEl)
+    new Setting(card)
       .setName("Provider")
+      .setDesc("The service this connection talks to. Changing it updates the fields below.")
       .addDropdown(drop =>
         drop
           .addOption("copilot", "Copilot")
@@ -80,7 +117,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
       );
 
     // Model
-    new Setting(containerEl)
+    new Setting(card)
       .setName("Default model")
       .setDesc("Override the provider default. Leave empty to use the provider's built-in default.")
       .addText(text =>
@@ -95,7 +132,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
 
     // Credentials per provider
     if (conn.provider === "copilot") {
-      new Setting(containerEl)
+      new Setting(card)
         .setName("Copilot API base URL")
         .setDesc("Base URL for the Copilot (or Copilot proxy) endpoint.")
         .addText(text =>
@@ -108,22 +145,20 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
-        .setName("Copilot API key")
-        .setDesc("API key / token for Copilot. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("token...")
-            .setValue(conn.apiKey)
-            .onChange(async (value) => {
-              conn.apiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
+      addSecretSetting(card, {
+        name: "Copilot API key",
+        desc: "API key / token for Copilot. Required.",
+        placeholder: "token...",
+        getValue: () => conn.apiKey,
+        setValue: async (value) => {
+          conn.apiKey = value;
+          await this.plugin.saveSettings();
+        },
+      });
     }
 
     if (conn.provider === "claude") {
-      new Setting(containerEl)
+      new Setting(card)
         .setName("Claude API base URL")
         .setDesc("Base URL for the Anthropic Messages API. Leave empty to use the default.")
         .addText(text =>
@@ -136,22 +171,20 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
-        .setName("Claude API key")
-        .setDesc("API key for Claude. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("sk-ant-...")
-            .setValue(conn.apiKey)
-            .onChange(async (value) => {
-              conn.apiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
+      addSecretSetting(card, {
+        name: "Claude API key",
+        desc: "API key for Claude. Required.",
+        placeholder: "sk-ant-...",
+        getValue: () => conn.apiKey,
+        setValue: async (value) => {
+          conn.apiKey = value;
+          await this.plugin.saveSettings();
+        },
+      });
     }
 
     if (conn.provider === "claude-proxy") {
-      new Setting(containerEl)
+      new Setting(card)
         .setName("Claude proxy API base URL")
         .setDesc("Base URL of an OpenAI-compatible endpoint that exposes Claude (e.g. OpenRouter, Together, internal gateway).")
         .addText(text =>
@@ -164,22 +197,20 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
-        .setName("Claude proxy API key")
-        .setDesc("OpenAI-format API key for the proxy. Sent as Authorization: Bearer <key>.")
-        .addText(text =>
-          text
-            .setPlaceholder("sk-...")
-            .setValue(conn.apiKey)
-            .onChange(async (value) => {
-              conn.apiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
+      addSecretSetting(card, {
+        name: "Claude proxy API key",
+        desc: "OpenAI-format API key for the proxy. Sent as Authorization: Bearer <key>.",
+        placeholder: "sk-...",
+        getValue: () => conn.apiKey,
+        setValue: async (value) => {
+          conn.apiKey = value;
+          await this.plugin.saveSettings();
+        },
+      });
     }
 
     if (conn.provider === "gemini") {
-      new Setting(containerEl)
+      new Setting(card)
         .setName("Gemini API base URL")
         .setDesc("Base URL for the Gemini API. Leave empty to use the default.")
         .addText(text =>
@@ -192,22 +223,20 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
-        .setName("Gemini API key")
-        .setDesc("API key for Gemini. Required.")
-        .addText(text =>
-          text
-            .setPlaceholder("AI...")
-            .setValue(conn.apiKey)
-            .onChange(async (value) => {
-              conn.apiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
+      addSecretSetting(card, {
+        name: "Gemini API key",
+        desc: "API key for Gemini. Required.",
+        placeholder: "AI...",
+        getValue: () => conn.apiKey,
+        setValue: async (value) => {
+          conn.apiKey = value;
+          await this.plugin.saveSettings();
+        },
+      });
     }
 
     if (conn.provider === "cli") {
-      new Setting(containerEl)
+      new Setting(card)
         .setName("CLI command")
         .setDesc("Binary name (e.g. claude) or absolute path. The prompt text is piped to stdin.")
         .addText(text =>
@@ -220,7 +249,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
+      new Setting(card)
         .setName("CLI arguments")
         .setDesc("Extra arguments passed to the CLI, space-separated.")
         .addText(text =>
@@ -233,7 +262,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
+      new Setting(card)
         .setName("Working directory")
         .setDesc("Leave empty to inherit from Obsidian; override to run in a specific directory.")
         .addText(text =>
@@ -247,8 +276,9 @@ export class AiAssistantSettingTab extends PluginSettingTab {
         );
     }
 
-    // Set-as-default + Remove controls
-    const controls = new Setting(containerEl);
+    // Footer: set-as-default + remove
+    const controls = new Setting(card);
+    controls.settingEl.addClass("ai-conn-footer");
     controls.addButton(btn => {
       if (isDefault) {
         btn.setButtonText("★ Default").setDisabled(true);
@@ -272,6 +302,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
           }
           const idx = this.plugin.settings.connections.findIndex(c => c.id === conn.id);
           this.plugin.settings.connections.splice(idx, 1);
+          this.expandedConnectionIds.delete(conn.id);
           if (this.plugin.settings.defaultConnectionId === conn.id) {
             const first = this.plugin.settings.connections[0];
             if (first) this.plugin.settings.defaultConnectionId = first.id;
@@ -280,6 +311,45 @@ export class AiAssistantSettingTab extends PluginSettingTab {
           this.display();
         })
     );
+  }
+
+  private renderTemplateReference(): void {
+    const { containerEl } = this;
+
+    const details = containerEl.createEl("details", { cls: "ai-help" });
+    details.createEl("summary", {
+      cls: "ai-help-summary",
+      text: "Template & override reference",
+    });
+
+    details.createEl("p", {
+      cls: "ai-help-intro",
+      text:
+        "Add these ai-* keys to a prompt template's YAML frontmatter to override the matching global setting for that single run. An invalid value falls back to the global setting with a warning.",
+    });
+
+    const pre = details.createEl("pre", { cls: "ai-help-example" });
+    pre.createEl("code", { text: buildExampleFrontmatter() });
+
+    const table = details.createEl("table", { cls: "ai-help-table" });
+    const headRow = table.createEl("thead").createEl("tr");
+    for (const heading of ["Key", "Type", "Overrides setting", "What it does & why", "Example"]) {
+      headRow.createEl("th", { text: heading });
+    }
+
+    const body = table.createEl("tbody");
+    for (const doc of TEMPLATE_PARAM_DOCS) {
+      const row = body.createEl("tr");
+      row.createEl("td").createEl("code", { text: doc.key });
+      row.createEl("td", { text: doc.type });
+
+      const overridesCell = row.createEl("td");
+      overridesCell.createEl("strong", { text: doc.overridesSetting });
+      overridesCell.createEl("div", { cls: "ai-help-detail", text: doc.overridesDetail });
+
+      row.createEl("td", { text: doc.description });
+      row.createEl("td").createEl("code", { text: doc.example });
+    }
   }
 
   display(): void {
@@ -292,14 +362,8 @@ export class AiAssistantSettingTab extends PluginSettingTab {
       "Add one or more named connections. The default is used for 'Ask AI'; templates can override it via ai-llm: <Name>."
     );
 
-    const connections = this.plugin.settings.connections;
-    let connIdx = 0;
-    for (const conn of connections) {
-      if (connIdx > 0) {
-        containerEl.createEl("hr");
-      }
+    for (const conn of this.plugin.settings.connections) {
       this.renderConnection(conn);
-      connIdx++;
     }
 
     new Setting(containerEl)
@@ -327,6 +391,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
               cliCwd: "",
             };
             this.plugin.settings.connections.push(conn);
+            this.expandedConnectionIds.add(conn.id);
             await this.plugin.saveSettings();
             this.display();
           })
@@ -440,7 +505,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
 
       const exclusions = this.plugin.settings.vaultNoteNamesExclusions;
       exclusions.forEach((pattern, idx) => {
-        new Setting(containerEl)
+        const row = new Setting(containerEl)
           .addText(text =>
             text
               .setPlaceholder("Untitled*")
@@ -460,6 +525,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
                 this.display();
               })
           );
+        row.settingEl.addClass("ai-exclusion-row");
       });
 
       new Setting(containerEl)
@@ -519,5 +585,8 @@ export class AiAssistantSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // ── Section F: Template & override reference ──────────────────────────────
+    this.renderTemplateReference();
   }
 }

@@ -30,3 +30,147 @@
   font-size: 12px;
   opacity: 0.6;
 }
+
+/* ── Settings: LLM connection cards ─────────────────────────────── */
+.ai-conn-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  margin: 10px 0;
+  background: var(--background-secondary);
+}
+
+.ai-conn-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+}
+
+.ai-conn-summary:hover {
+  background: var(--background-modifier-hover);
+}
+
+.ai-conn-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ai-conn-summary::before {
+  content: "▸";
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.ai-conn-card[open] > .ai-conn-summary::before {
+  transform: rotate(90deg);
+}
+
+.ai-conn-name {
+  font-weight: 600;
+}
+
+.ai-conn-pill {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.ai-conn-badge {
+  font-size: 12px;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.ai-conn-warning {
+  margin-left: auto;
+  color: var(--text-warning, var(--text-error));
+  cursor: help;
+}
+
+.ai-conn-card > .setting-item {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.ai-conn-footer {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ── Settings: compact excluded-name-pattern rows ───────────────── */
+.ai-exclusion-row {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.ai-exclusion-row .setting-item-info {
+  display: none;
+}
+
+.ai-exclusion-row .setting-item-control {
+  justify-content: flex-start;
+}
+
+.ai-exclusion-row .setting-item-control input[type="text"] {
+  flex: 1;
+}
+
+/* ── Settings: template & override reference ────────────────────── */
+.ai-help {
+  margin-top: 18px;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 12px;
+}
+
+.ai-help-summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.ai-help-intro {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ai-help-example {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+
+.ai-help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.ai-help-table th,
+.ai-help-table td {
+  border: 1px solid var(--background-modifier-border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ai-help-table th {
+  background: var(--background-secondary);
+}
+
+.ai-help-table code {
+  white-space: nowrap;
+}
+
+.ai-help-detail {
+  color: var(--text-muted);
+  margin-top: 2px;
+}
