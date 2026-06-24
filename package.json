@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-ai-assistant",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Use Copilot, Claude, Gemini, or a local CLI tool to generate AI results directly inside the current note.",
 	"main": "main.js",
 	"scripts": {
@@ -11,7 +11,7 @@
 		"test": "vitest run"
 	},
 	"keywords": [],
-	"license": "0BSD",
+	"license": "GPL-3.0-only",
 	"devDependencies": {
 		"@eslint/js": "9.30.1",
 		"@types/node": "^22.0.0",

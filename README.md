@@ -217,4 +217,4 @@ See [`AGENTS.md`](AGENTS.md) for the full project conventions.
 
 ## License
 
-[0BSD](LICENSE)
+[GNU GPLv3](LICENSE)
