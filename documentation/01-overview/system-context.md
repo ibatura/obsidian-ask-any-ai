@@ -2,7 +2,7 @@
 
 ## What the plugin does
 
-AI Assistant adds **one** Obsidian command — *Ask AI* — that takes the user's selected text (or current line), optionally expands `[[wikilinks]]` and a system prompt, sends the payload to a configured LLM provider, and inserts the response back into the same note at a configurable position.
+Ask Any AI adds **one** Obsidian command — *Ask AI* — that takes the user's selected text (or current line), optionally expands `[[wikilinks]]` and a system prompt, sends the payload to a configured LLM provider, and inserts the response back into the same note at a configurable position.
 
 The entire feature is built around a single command pipeline. There are no background workers, no telemetry, no automatic file writes outside the active editor.
 

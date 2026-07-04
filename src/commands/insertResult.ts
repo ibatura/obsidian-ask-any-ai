@@ -174,7 +174,7 @@ export async function insertLlmResultWithTemplate(
     new Notice(
       `Template override warnings:\n${allWarnings.map((w) => `• ${w}`).join("\n")}`
     );
-    console.warn("[ai-assistant] Template override warnings:", allWarnings);
+    console.warn("[ask-any-ai] Template override warnings:", allWarnings);
   }
 
   if (!connection) return;

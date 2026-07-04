@@ -1,15 +1,15 @@
-# AI Assistant for Obsidian
+# Ask Any AI for Obsidian
 
 Run any LLM from inside your note. Select text, hit a hotkey, get the result inserted in place — with `[[wikilinks]]` automatically expanded, your own system prompts, and support for multiple named connections across five provider types.
 
-> **Status**: desktop-only · Obsidian ≥ 1.5.0 · `id: ai-assistant`
+> **Status**: desktop-only · Obsidian ≥ 1.5.0 · `id: ask-any-ai`
 
 ---
 
 ## Quick start
 
 1. Install the plugin (see [Installation](#installation)).
-2. Open **Settings → AI Assistant**. A default "Default" connection (Copilot) is pre-configured — fill in the API key, or add a new connection for a different provider.
+2. Open **Settings → Ask Any AI**. A default "Default" connection (Copilot) is pre-configured — fill in the API key, or add a new connection for a different provider.
 3. In any note, select a sentence and run **Ask AI** from the command palette (`Ctrl/Cmd+P`).
 4. The result is inserted just below your selection under an `## AI Result` heading.
 
@@ -63,19 +63,19 @@ A persistent progress notice shows where you are in the pipeline and how long it
 
 ### From the community plugin store
 
-**Settings → Community plugins → Browse**, search for *AI Assistant*, install, enable.
+**Settings → Community plugins → Browse**, search for *Ask Any AI*, install, enable.
 
 ### Manual
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from a release.
-2. Copy them into `<Vault>/.obsidian/plugins/ai-assistant/`.
+2. Copy them into `<Vault>/.obsidian/plugins/ask-any-ai/`.
 3. Reload Obsidian and enable the plugin in **Settings → Community plugins**.
 
 ---
 
 ## Configuration
 
-Open **Settings → AI Assistant**. The settings tab has four sections.
+Open **Settings → Ask Any AI**. The settings tab has four sections.
 
 ### 1. LLM connections
 
@@ -187,7 +187,7 @@ For the local CLI provider, the plugin spawns the configured command with `shell
 
 - Network requests are made **only** to the provider you configure, only when you invoke the command.
 - Nothing is uploaded automatically. Vault content is sent to the provider only when it is part of the input you select (or when wikilink expansion pulls in a referenced note, or when "vault note names context" is on).
-- API keys are stored locally via Obsidian's plugin data store (`<Vault>/.obsidian/plugins/ai-assistant/data.json`).
+- API keys are stored locally via Obsidian's plugin data store (`<Vault>/.obsidian/plugins/ask-any-ai/data.json`).
 - No telemetry, no analytics, no remote auto-update.
 
 ---
@@ -209,7 +209,7 @@ npm test       # vitest run
 npm run lint   # eslint
 ```
 
-To test inside a vault, symlink the repo into `<Vault>/.obsidian/plugins/ai-assistant/`, run `npm run dev`, and reload Obsidian (`Ctrl/Cmd+R`) after changes.
+To test inside a vault, symlink the repo into `<Vault>/.obsidian/plugins/ask-any-ai/`, run `npm run dev`, and reload Obsidian (`Ctrl/Cmd+R`) after changes.
 
 See [`AGENTS.md`](AGENTS.md) for the full project conventions.
 

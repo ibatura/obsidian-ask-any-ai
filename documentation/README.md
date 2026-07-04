@@ -1,6 +1,6 @@
 # Architecture documentation
 
-This folder is the architecture-level technical reference for the **AI Assistant** Obsidian plugin. It is written for developers and AI agents who need to understand *how the plugin is built* — not how to install or use it.
+This folder is the architecture-level technical reference for the **Ask Any AI** Obsidian plugin. It is written for developers and AI agents who need to understand *how the plugin is built* — not how to install or use it.
 
 It is intended to be **self-contained**: every architectural fact, design rationale, and behavioural detail needed to understand or evolve the plugin lives here, alongside links into [`src/`](../src/) for the canonical implementation.
 

@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-ai-assistant",
+	"name": "obsidian-ask-any-ai",
 	"version": "1.0.0",
 	"description": "Use Copilot, Claude, Gemini, or a local CLI tool to generate AI results directly inside the current note.",
 	"main": "main.js",
