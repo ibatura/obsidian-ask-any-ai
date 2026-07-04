@@ -22,7 +22,7 @@ It is intended to be **self-contained**: every architectural fact, design ration
 - [Module map](02-architecture/module-map.md) — folder-by-folder map of `src/` and dependency graph
 - [Plugin lifecycle](02-architecture/plugin-lifecycle.md) — `onload` / `onunload`, settings load, command registration
 - [Command pipeline](02-architecture/command-pipeline.md) — end-to-end flow of *Ask AI*
-- [Settings model](02-architecture/settings-model.md) — `AiAssistantSettings` shape, defaults, migration
+- [Settings model](02-architecture/settings-model.md) — `AskAnyAiSettings` shape, defaults, migration
 - [Data flow](02-architecture/data-flow.md) — input → expansion → LLM → insertion
 
 ### 03 — Features

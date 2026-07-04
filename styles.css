@@ -12,7 +12,7 @@
 }
 
 .ai-progress-bar-container {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--background-modifier-border);
   border-radius: 4px;
   height: 4px;
   overflow: hidden;

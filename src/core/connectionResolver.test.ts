@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getDefaultConnection, resolveConnection } from "./connectionResolver";
-import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
+import { AskAnyAiSettings, LlmConnection, generateConnectionId } from "../settings";
 
 function makeConn(overrides: Partial<LlmConnection> = {}): LlmConnection {
   return {
@@ -20,8 +20,8 @@ function makeConn(overrides: Partial<LlmConnection> = {}): LlmConnection {
 function makeSettings(
   connections: LlmConnection[],
   defaultId?: string,
-  extra: Partial<AiAssistantSettings> = {}
-): AiAssistantSettings {
+  extra: Partial<AskAnyAiSettings> = {}
+): AskAnyAiSettings {
   return {
     connections,
     defaultConnectionId: defaultId ?? connections[0]?.id ?? "",

@@ -1,5 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
-import type AiAssistantPlugin from "../main";
+import type AskAnyAiPlugin from "../main";
 import { LlmConnection, LlmProvider, generateConnectionId } from "../settings";
 import { validateConnection } from "../core/providerValidation";
 import { addSecretSetting } from "./secretField";
@@ -21,13 +21,13 @@ const PROVIDER_LABELS: Record<LlmProvider, string> = {
   cli: "Local CLI",
 };
 
-export class AiAssistantSettingTab extends PluginSettingTab {
-  plugin: AiAssistantPlugin;
+export class AskAnyAiSettingTab extends PluginSettingTab {
+  plugin: AskAnyAiPlugin;
 
   /** Connection ids whose cards are currently expanded, preserved across display() re-renders. */
   private expandedConnectionIds = new Set<string>();
 
-  constructor(app: App, plugin: AiAssistantPlugin) {
+  constructor(app: App, plugin: AskAnyAiPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }

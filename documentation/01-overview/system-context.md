@@ -11,7 +11,7 @@ The entire feature is built around a single command pipeline. There are no backg
 ```mermaid
 graph LR
   User -->|select text + run command| Obsidian[Obsidian Editor]
-  Obsidian -->|editorCallback| Plugin[AiAssistantPlugin]
+  Obsidian -->|editorCallback| Plugin[AskAnyAiPlugin]
   Plugin -->|HTTP requestUrl| Copilot[Copilot / OpenAI-compatible]
   Plugin -->|HTTP requestUrl| Claude[Anthropic Messages API]
   Plugin -->|HTTP requestUrl| ClaudeProxy[Claude proxy / OpenRouter]

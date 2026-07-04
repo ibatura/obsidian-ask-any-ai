@@ -1,5 +1,5 @@
 import { App, SuggestModal, TFile, normalizePath } from "obsidian";
-import { AiAssistantSettings } from "../settings";
+import { AskAnyAiSettings } from "../settings";
 
 interface PromptItem {
   file: TFile | null;
@@ -11,7 +11,7 @@ export class PromptPickerModal extends SuggestModal<PromptItem> {
   private promise: Promise<TFile | null | "cancelled">;
   private chosen = false;
 
-  constructor(app: App, private settings: AiAssistantSettings) {
+  constructor(app: App, private settings: AskAnyAiSettings) {
     super(app);
     this.promise = new Promise(res => { this.resolve = res; });
   }

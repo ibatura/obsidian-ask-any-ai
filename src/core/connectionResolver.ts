@@ -1,7 +1,7 @@
-import { AiAssistantSettings, LlmConnection } from "../settings";
+import { AskAnyAiSettings, LlmConnection } from "../settings";
 import { validateConnection } from "./providerValidation";
 
-export function getDefaultConnection(settings: AiAssistantSettings): LlmConnection | null {
+export function getDefaultConnection(settings: AskAnyAiSettings): LlmConnection | null {
   const byId = settings.connections.find(c => c.id === settings.defaultConnectionId);
   if (byId) return byId;
   if (settings.connections.length > 0) return settings.connections[0] ?? null;
@@ -14,7 +14,7 @@ export interface ResolveResult {
 }
 
 export function resolveConnection(
-  settings: AiAssistantSettings,
+  settings: AskAnyAiSettings,
   options: { llmName?: string; modelOverride?: string }
 ): ResolveResult {
   const warnings: string[] = [];

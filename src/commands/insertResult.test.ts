@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { insertLlmResultRaw, insertLlmResultWithTemplate } from "./insertResult";
-import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
+import { AskAnyAiSettings, LlmConnection, generateConnectionId } from "../settings";
 
 let mockOpenAndAwait = vi.fn().mockResolvedValue(null);
 
@@ -70,7 +70,7 @@ function makeCliConnection(overrides: Partial<LlmConnection> = {}): LlmConnectio
   };
 }
 
-function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+function makeSettings(overrides: Partial<AskAnyAiSettings> = {}): AskAnyAiSettings {
   const conn = makeCliConnection();
   return {
     connections: [conn],
@@ -86,14 +86,14 @@ function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistant
     vaultNoteNamesExclusions: ["Untitled*", "Screenshot*"],
     debug: false,
     ...overrides,
-  } as AiAssistantSettings;
+  } as AskAnyAiSettings;
 }
 
 describe("insertLlmResultRaw", () => {
   let mockEditor: ReturnType<typeof makeEditor>;
   let mockApp: ReturnType<typeof makeApp>;
   let mockFile: { path: string };
-  let mockSettings: AiAssistantSettings;
+  let mockSettings: AskAnyAiSettings;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -186,7 +186,7 @@ describe("insertLlmResultWithTemplate", () => {
   let mockEditor: ReturnType<typeof makeEditor>;
   let mockApp: ReturnType<typeof makeApp>;
   let mockFile: { path: string };
-  let mockSettings: AiAssistantSettings;
+  let mockSettings: AskAnyAiSettings;
 
   beforeEach(() => {
     vi.clearAllMocks();

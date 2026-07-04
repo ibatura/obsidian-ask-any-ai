@@ -1,13 +1,13 @@
 # Plugin lifecycle
 
-The plugin entrypoint is [src/main.ts](../../src/main.ts) — class `AiAssistantPlugin` extending Obsidian's `Plugin`.
+The plugin entrypoint is [src/main.ts](../../src/main.ts) — class `AskAnyAiPlugin` extending Obsidian's `Plugin`.
 
 ## `onload()`
 
 ```mermaid
 sequenceDiagram
   participant Obsidian
-  participant Plugin as AiAssistantPlugin
+  participant Plugin as AskAnyAiPlugin
   participant Settings as settings.ts
   participant Tab as ui/settingsTab.ts
   participant Cmd as commands/index.ts
@@ -16,7 +16,7 @@ sequenceDiagram
   Plugin->>Plugin: loadSettings()
   Plugin->>Settings: loadData() + Object.assign(DEFAULT_SETTINGS, saved)
   Plugin->>Plugin: legacy migration ("from-folder" → "picker")
-  Plugin->>Tab: addSettingTab(new AiAssistantSettingTab(app, plugin))
+  Plugin->>Tab: addSettingTab(new AskAnyAiSettingTab(app, plugin))
   Plugin->>Cmd: registerCommands(plugin)
   Cmd->>Obsidian: addCommand({ id, name, editorCallback })
 ```
@@ -24,7 +24,7 @@ sequenceDiagram
 Sequence in code ([src/main.ts:9](../../src/main.ts:9)):
 
 1. `await this.loadSettings()`
-2. `this.addSettingTab(new AiAssistantSettingTab(this.app, this))`
+2. `this.addSettingTab(new AskAnyAiSettingTab(this.app, this))`
 3. `registerCommands(this)`
 
 That is the entire `onload`. There is no `onunload` override — Obsidian's default cleanup is sufficient because everything that requires teardown (commands, settings tab) is registered through Obsidian APIs that are auto-disposed on plugin unload.
@@ -38,7 +38,7 @@ const saved = await this.loadData();
 this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 ```
 
-- Defaults from [src/settings.ts:48](../../src/settings.ts:48) provide every field, so settings always satisfy the `AiAssistantSettings` interface even before the user opens the settings tab.
+- Defaults from [src/settings.ts:48](../../src/settings.ts:48) provide every field, so settings always satisfy the `AskAnyAiSettings` interface even before the user opens the settings tab.
 - `Object.assign({}, DEFAULT_SETTINGS, saved)` is shallow — array fields like `vaultNoteNamesExclusions` are replaced wholesale by the saved value (not merged).
 
 ### Legacy migration

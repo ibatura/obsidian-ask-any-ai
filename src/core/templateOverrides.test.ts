@@ -4,7 +4,7 @@ import {
   applyOverrides,
   stripFrontmatter,
 } from "./templateOverrides";
-import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
+import { AskAnyAiSettings, LlmConnection, generateConnectionId } from "../settings";
 
 function makeConn(overrides: Partial<LlmConnection> = {}): LlmConnection {
   return {
@@ -21,7 +21,7 @@ function makeConn(overrides: Partial<LlmConnection> = {}): LlmConnection {
   };
 }
 
-function makeSettings(overrides: Partial<AiAssistantSettings> = {}): AiAssistantSettings {
+function makeSettings(overrides: Partial<AskAnyAiSettings> = {}): AskAnyAiSettings {
   const conn = makeConn();
   return {
     connections: [conn],

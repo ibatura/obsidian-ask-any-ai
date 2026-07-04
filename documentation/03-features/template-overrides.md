@@ -53,10 +53,10 @@ All warnings for a run are shown in a single Obsidian `Notice` and logged to the
 
 ```ts
 // applyOverrides in src/core/templateOverrides.ts
-const effective: AiAssistantSettings = { ...global, ...overrides };
+const effective: AskAnyAiSettings = { ...global, ...overrides };
 ```
 
-`applyOverrides` shallow-clones `global` and spreads `overrides` over it. The result is an `AiAssistantSettings` used for one invocation only. Connection resolution (`resolveConnection`) runs afterward with the `llmName` and `modelOverride` parsed from frontmatter.
+`applyOverrides` shallow-clones `global` and spreads `overrides` over it. The result is an `AskAnyAiSettings` used for one invocation only. Connection resolution (`resolveConnection`) runs afterward with the `llmName` and `modelOverride` parsed from frontmatter.
 
 ## Frontmatter stripping
 

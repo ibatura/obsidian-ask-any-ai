@@ -1,6 +1,6 @@
 # Settings model
 
-The settings shape is defined in [src/settings.ts](../../src/settings.ts) as the `AiAssistantSettings` interface. Defaults live in `DEFAULT_SETTINGS`. The settings UI in [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) renders the same fields, grouped into four logical sections.
+The settings shape is defined in [src/settings.ts](../../src/settings.ts) as the `AskAnyAiSettings` interface. Defaults live in `DEFAULT_SETTINGS`. The settings UI in [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) renders the same fields, grouped into four logical sections.
 
 ## Field reference
 

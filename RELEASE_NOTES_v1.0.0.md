@@ -45,4 +45,4 @@ First public release. Ask Any AI adds a single **Ask AI** workflow to Obsidian: 
 
 See the [README](README.md) for full configuration details and [`documentation/`](documentation/README.md) for architecture notes.
 
-**Full Changelog**: https://github.com/ibatura/obsidian-ai-assistant/commits/1.0.0
+**Full Changelog**: https://github.com/ibatura/obsidian-ask-any-ai/commits/1.0.0

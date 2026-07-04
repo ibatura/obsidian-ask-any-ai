@@ -5,7 +5,7 @@
 ```
 src/
 ├── main.ts                        Plugin entrypoint — lifecycle only
-├── settings.ts                    AiAssistantSettings interface, DEFAULT_SETTINGS, types
+├── settings.ts                    AskAnyAiSettings interface, DEFAULT_SETTINGS, types
 ├── commands/
 │   ├── index.ts                   registerCommands() — single editor command
 │   └── insertResult.ts            insertLlmResultInPlace() — the 9-step pipeline
@@ -15,7 +15,7 @@ src/
 │   ├── promptResolver.ts          resolveLlmPrompt() — none/inline/picker dispatch
 │   └── noteNamesContext.ts        buildNoteNamesBlock() — vault enumeration
 └── ui/
-    ├── settingsTab.ts             AiAssistantSettingTab — settings UI
+    ├── settingsTab.ts             AskAnyAiSettingTab — settings UI
     ├── promptPickerModal.ts       PromptPickerModal — runtime prompt picker
     └── progressIndicator.ts       showProgressIndicator() — Notice-based progress
 ```
@@ -24,15 +24,15 @@ src/
 
 | File | Exports | Responsibility |
 |---|---|---|
-| [src/main.ts](../../src/main.ts) | `AiAssistantPlugin` (default) | `onload`, `loadSettings` (with legacy migration), `saveSettings` |
-| [src/settings.ts](../../src/settings.ts) | `AiAssistantSettings`, `LlmProvider`, `DEFAULT_SETTINGS` | Shape of persisted settings + defaults |
+| [src/main.ts](../../src/main.ts) | `AskAnyAiPlugin` (default) | `onload`, `loadSettings` (with legacy migration), `saveSettings` |
+| [src/settings.ts](../../src/settings.ts) | `AskAnyAiSettings`, `LlmProvider`, `DEFAULT_SETTINGS` | Shape of persisted settings + defaults |
 | [src/commands/index.ts](../../src/commands/index.ts) | `registerCommands` | Wire the single command to Obsidian |
 | [src/commands/insertResult.ts](../../src/commands/insertResult.ts) | `insertLlmResultInPlace` | End-to-end command pipeline |
 | [src/core/llmClient.ts](../../src/core/llmClient.ts) | `LlmClient`, `LlmRequest`, `CopilotClient`, `ClaudeClient`, `ClaudeProxyClient`, `GeminiClient`, `CliClient`, `createLlmClient` | Provider abstraction + factory |
 | [src/core/linkResolver.ts](../../src/core/linkResolver.ts) | `expandObsidianLinks`, `LinkExpansionResult` | Replace `[[Note]]` / `[[Note#H]]` / `[[Note#^id]]` with content |
 | [src/core/promptResolver.ts](../../src/core/promptResolver.ts) | `resolveLlmPrompt` | Map `llmPromptMode` to a system-prompt string |
 | [src/core/noteNamesContext.ts](../../src/core/noteNamesContext.ts) | `buildNoteNamesBlock`, `patternToRegex`, `matchesExclusionPattern` | Vault note list + glob exclusions |
-| [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) | `AiAssistantSettingTab` | The 5-section settings UI |
+| [src/ui/settingsTab.ts](../../src/ui/settingsTab.ts) | `AskAnyAiSettingTab` | The 5-section settings UI |
 | [src/ui/promptPickerModal.ts](../../src/ui/promptPickerModal.ts) | `PromptPickerModal` | `SuggestModal` for runtime prompt selection |
 | [src/ui/progressIndicator.ts](../../src/ui/progressIndicator.ts) | `showProgressIndicator`, `ProgressController` | `Notice`-based progress UI |
 

@@ -1,5 +1,5 @@
 import { App, Editor, Notice, TFile } from "obsidian";
-import { AiAssistantSettings, LlmConnection } from "../settings";
+import { AskAnyAiSettings, LlmConnection } from "../settings";
 import { resolveInlinePrompt } from "../core/promptResolver";
 import { expandObsidianLinks } from "../core/linkResolver";
 import { buildNoteNamesBlock } from "../core/noteNamesContext";
@@ -20,7 +20,7 @@ async function runRequest(
   editor: Editor,
   file: TFile,
   app: App,
-  settings: AiAssistantSettings,
+  settings: AskAnyAiSettings,
   connection: LlmConnection,
   rawInput: string,
   systemPrompt: string,
@@ -107,7 +107,7 @@ export async function insertLlmResultRaw(
   editor: Editor,
   file: TFile | null,
   app: App,
-  settings: AiAssistantSettings,
+  settings: AskAnyAiSettings,
 ): Promise<void> {
   if (!file) {
     new Notice("No active file");
@@ -143,7 +143,7 @@ export async function insertLlmResultWithTemplate(
   editor: Editor,
   file: TFile | null,
   app: App,
-  settings: AiAssistantSettings,
+  settings: AskAnyAiSettings,
 ): Promise<void> {
   if (!file) {
     new Notice("No active file");

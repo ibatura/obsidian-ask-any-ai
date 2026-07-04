@@ -1,7 +1,7 @@
-import type AiAssistantPlugin from "../main";
+import type AskAnyAiPlugin from "../main";
 import { insertLlmResultRaw, insertLlmResultWithTemplate } from "./insertResult";
 
-export function registerCommands(plugin: AiAssistantPlugin): void {
+export function registerCommands(plugin: AskAnyAiPlugin): void {
   plugin.addCommand({
     id: "ask-ai",
     name: "Ask AI",

@@ -1,10 +1,10 @@
-import { AiAssistantSettings } from "../settings";
+import { AskAnyAiSettings } from "../settings";
 
 const ALLOWED_INSERT_POSITIONS = ["at-cursor", "after-selection", "end-of-file"] as const;
 
 export type TemplateOverrides = Partial<
   Pick<
-    AiAssistantSettings,
+    AskAnyAiSettings,
     | "llmResultHeading"
     | "insertPosition"
     | "debug"
@@ -22,7 +22,7 @@ export interface ParseResult {
 }
 
 export interface ApplyResult {
-  effective: AiAssistantSettings;
+  effective: AskAnyAiSettings;
   warnings: string[];
 }
 
@@ -114,10 +114,10 @@ export function parseTemplateOverrides(
 }
 
 export function applyOverrides(
-  global: AiAssistantSettings,
+  global: AskAnyAiSettings,
   overrides: TemplateOverrides
 ): ApplyResult {
-  const effective: AiAssistantSettings = { ...global, ...overrides };
+  const effective: AskAnyAiSettings = { ...global, ...overrides };
   return { effective, warnings: [] };
 }
 

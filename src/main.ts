@@ -1,15 +1,15 @@
 import { Plugin } from "obsidian";
-import { AiAssistantSettings, DEFAULT_SETTINGS } from "./settings";
-import { AiAssistantSettingTab } from "./ui/settingsTab";
+import { AskAnyAiSettings, DEFAULT_SETTINGS } from "./settings";
+import { AskAnyAiSettingTab } from "./ui/settingsTab";
 import { registerCommands } from "./commands";
 import { migrateSettings } from "./core/settingsMigration";
 
-export default class AiAssistantPlugin extends Plugin {
-  settings!: AiAssistantSettings;
+export default class AskAnyAiPlugin extends Plugin {
+  settings!: AskAnyAiSettings;
 
   async onload() {
     await this.loadSettings();
-    this.addSettingTab(new AiAssistantSettingTab(this.app, this));
+    this.addSettingTab(new AskAnyAiSettingTab(this.app, this));
     registerCommands(this);
   }
 

@@ -16,7 +16,7 @@ export function generateConnectionId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-export interface AiAssistantSettings {
+export interface AskAnyAiSettings {
   connections: LlmConnection[];
   defaultConnectionId: string;
   timeoutMs: number;
@@ -55,7 +55,7 @@ function makeDefaultConnection(): LlmConnection {
 
 const _defaultConn = makeDefaultConnection();
 
-export const DEFAULT_SETTINGS: AiAssistantSettings = {
+export const DEFAULT_SETTINGS: AskAnyAiSettings = {
   connections: [_defaultConn],
   defaultConnectionId: _defaultConn.id,
   timeoutMs: 60000,

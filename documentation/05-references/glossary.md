@@ -21,5 +21,5 @@ Plugin-specific terms used throughout this documentation and the code.
 | **Progress controller** | The object returned by `showProgressIndicator(initial)` ([progressIndicator.ts:15](../../src/ui/progressIndicator.ts:15)). Drives the `Notice`-based progress UI through `updateStatus` / `complete` / `close`. |
 | **CLI provider** | A local subprocess (`claude`, `llm`, `gemini`, etc.) spawned by `CliClient` with stdin/stdout piping. Requires the plugin to run in a Node-enabled context (`isDesktopOnly: true`). |
 | **`requestUrl`** | Obsidian's CORS-safe HTTP helper used by all four HTTP providers. Configured with `throw: true` so non-2xx responses raise an error. |
-| **Settings tab** | The Obsidian settings page rendered by `AiAssistantSettingTab` ([src/ui/settingsTab.ts](../../src/ui/settingsTab.ts)). Four logical sections; saves on every change. |
+| **Settings tab** | The Obsidian settings page rendered by `AskAnyAiSettingTab` ([src/ui/settingsTab.ts](../../src/ui/settingsTab.ts)). Four logical sections; saves on every change. |
 | **SDD** | Spec-Driven Development — the repo's feature workflow: proposal → design → tasks → execution. Defined in [AGENTS.md](../../AGENTS.md). |
