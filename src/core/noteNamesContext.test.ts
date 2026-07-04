@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { matchesExclusionPattern, patternToRegex, buildNoteNamesBlock } from "./noteNamesContext";
+import { matchesExclusionPattern, buildNoteNamesBlock } from "./noteNamesContext";
 import type { TFile } from "obsidian";
 
 // ── patternToRegex / matchesExclusionPattern ──────────────────────────────

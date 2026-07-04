@@ -11,6 +11,18 @@ export interface LlmClient {
   generateResult(req: LlmRequest): Promise<string>;
 }
 
+interface OpenAiChatCompletionResponse {
+  choices?: { message?: { content?: string } }[];
+}
+
+interface AnthropicMessagesResponse {
+  content?: { type: string; text?: string }[];
+}
+
+interface GeminiGenerateContentResponse {
+  candidates?: { content?: { parts?: { text?: string }[] } }[];
+}
+
 export class CopilotClient implements LlmClient {
   constructor(private connection: LlmConnection) {}
 
@@ -34,8 +46,8 @@ export class CopilotClient implements LlmClient {
       body: JSON.stringify(body),
       throw: true,
     });
-    const data = response.json;
-    return data?.choices?.[0]?.message?.content?.trim() ?? "";
+    const data = response.json as OpenAiChatCompletionResponse;
+    return data.choices?.[0]?.message?.content?.trim() ?? "";
   }
 }
 
@@ -64,12 +76,12 @@ export class ClaudeClient implements LlmClient {
       body: JSON.stringify(body),
       throw: true,
     });
-    const data = response.json;
-    const blocks = data?.content;
+    const data = response.json as AnthropicMessagesResponse;
+    const blocks = data.content;
     if (Array.isArray(blocks)) {
       return blocks
-        .filter((b: { type: string }) => b.type === "text")
-        .map((b: { text: string }) => b.text)
+        .filter((b) => b.type === "text")
+        .map((b) => b.text ?? "")
         .join("")
         .trim();
     }
@@ -106,8 +118,8 @@ export class ClaudeProxyClient implements LlmClient {
       body: JSON.stringify(body),
       throw: true,
     });
-    const data = response.json;
-    return data?.choices?.[0]?.message?.content?.trim() ?? "";
+    const data = response.json as OpenAiChatCompletionResponse;
+    return data.choices?.[0]?.message?.content?.trim() ?? "";
   }
 }
 
@@ -138,10 +150,10 @@ const body: Record<string, unknown> = {
       body: JSON.stringify(body),
       throw: true,
     });
-    const data = response.json;
-    const parts = data?.candidates?.[0]?.content?.parts;
+    const data = response.json as GeminiGenerateContentResponse;
+    const parts = data.candidates?.[0]?.content?.parts;
     if (Array.isArray(parts)) {
-      return parts.map((p: { text: string }) => p.text).join("").trim();
+      return parts.map((p) => p.text ?? "").join("").trim();
     }
     return "";
   }

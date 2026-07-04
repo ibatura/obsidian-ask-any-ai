@@ -83,7 +83,7 @@ export function parseTemplateOverrides(
     if (key === "ai-insert-position") {
       if (!ALLOWED_INSERT_POSITIONS.includes(value as (typeof ALLOWED_INSERT_POSITIONS)[number])) {
         warnings.push(
-          `Invalid value for "${key}": "${value}" — expected one of ${ALLOWED_INSERT_POSITIONS.join(", ")}. Using global setting.`
+          `Invalid value for "${key}": "${String(value)}" — expected one of ${ALLOWED_INSERT_POSITIONS.join(", ")}. Using global setting.`
         );
       } else {
         overrides.insertPosition = value as "at-cursor" | "after-selection" | "end-of-file";
@@ -94,7 +94,7 @@ export function parseTemplateOverrides(
     if (BOOLEAN_KEYS.has(key)) {
       if (typeof value !== "boolean") {
         warnings.push(
-          `Invalid value for "${key}": "${value}" — expected a boolean (true/false). Using global setting.`
+          `Invalid value for "${key}": "${String(value)}" — expected a boolean (true/false). Using global setting.`
         );
       } else {
         (overrides as Record<string, unknown>)[AI_KEY_TO_SETTING[key]!] = value;

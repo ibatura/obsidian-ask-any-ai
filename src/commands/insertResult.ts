@@ -116,7 +116,7 @@ export async function insertLlmResultRaw(
 
   const rawInput = getRawInput(editor);
   if (!rawInput.trim()) {
-    new Notice("Nothing to send to AI Agent");
+    new Notice("Nothing to send to AI agent");
     return;
   }
 
@@ -152,7 +152,7 @@ export async function insertLlmResultWithTemplate(
 
   const rawInput = getRawInput(editor);
   if (!rawInput.trim()) {
-    new Notice("Nothing to send to AI Agent");
+    new Notice("Nothing to send to AI agent");
     return;
   }
 

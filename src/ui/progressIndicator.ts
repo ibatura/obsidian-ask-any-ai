@@ -16,9 +16,9 @@ export function showProgressIndicator(initialMessage: string): ProgressControlle
   if (typeof document === "undefined") return noop;
 
   const notice = new Notice("", 0);
-  notice.noticeEl.empty();
+  notice.messageEl.empty();
 
-  const wrapper = notice.noticeEl.createDiv({ cls: "ai-progress-wrapper" });
+  const wrapper = notice.messageEl.createDiv({ cls: "ai-progress-wrapper" });
   const statusEl = wrapper.createDiv({ cls: "ai-progress-status" });
   const barContainer = wrapper.createDiv({ cls: "ai-progress-bar-container" });
   const barFill = barContainer.createDiv({ cls: "ai-progress-bar-fill" });

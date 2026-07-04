@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { insertLlmResultRaw, insertLlmResultWithTemplate } from "./insertResult";
 import { AiAssistantSettings, LlmConnection, generateConnectionId } from "../settings";
 
-let mockOpenAndAwait = vi.fn().mockResolvedValue(null as null);
+let mockOpenAndAwait = vi.fn().mockResolvedValue(null);
 
 vi.mock("../ui/progressIndicator", () => ({
   showProgressIndicator: vi.fn(() => ({

@@ -56,7 +56,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     const nameEl = summary.createEl("span", { cls: "ai-conn-name", text: conn.name });
     summary.createEl("span", { cls: "ai-conn-pill", text: PROVIDER_LABELS[conn.provider] });
     if (isDefault) {
-      summary.createEl("span", { cls: "ai-conn-badge", text: "★ Default" });
+      summary.createEl("span", { cls: "ai-conn-badge", text: "★ default" });
     }
     const validationError = validateConnection(conn);
     if (validationError) {
@@ -74,7 +74,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
       )
       .addText(text =>
         text
-          .setPlaceholder("e.g. Work Claude")
+          .setPlaceholder("Work Claude")
           .setValue(conn.name)
           .onChange(async (value) => {
             const trimmed = value.trim();
@@ -238,7 +238,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     if (conn.provider === "cli") {
       new Setting(card)
         .setName("CLI command")
-        .setDesc("Binary name (e.g. claude) or absolute path. The prompt text is piped to stdin.")
+        .setDesc("Binary name (for example, `claude`) or absolute path. The prompt text is piped to stdin.")
         .addText(text =>
           text
             .setPlaceholder("claude")
@@ -281,7 +281,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     controls.settingEl.addClass("ai-conn-footer");
     controls.addButton(btn => {
       if (isDefault) {
-        btn.setButtonText("★ Default").setDisabled(true);
+        btn.setButtonText("★ default").setDisabled(true);
       } else {
         btn.setButtonText("Set as default").onClick(async () => {
           this.plugin.settings.defaultConnectionId = conn.id;
@@ -325,7 +325,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     details.createEl("p", {
       cls: "ai-help-intro",
       text:
-        "Add these ai-* keys to a prompt template's YAML frontmatter to override the matching global setting for that single run. An invalid value falls back to the global setting with a warning.",
+        "Add these `ai-*` keys to a prompt template's YAML frontmatter to override the matching global setting for that single run. An invalid value falls back to the global setting with a warning.",
     });
 
     const pre = details.createEl("pre", { cls: "ai-help-example" });
@@ -369,7 +369,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .addButton(btn =>
         btn
-          .setButtonText("+ Add connection")
+          .setButtonText("+ add connection")
           .onClick(async () => {
             const existing = new Set(
               this.plugin.settings.connections.map(c => c.name.toLowerCase())
@@ -452,7 +452,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Prompts templates folder")
-      .setDesc("Vault-relative path to the folder containing your prompt template files (used by 'Ask AI with template').")
+      .setDesc("Vault-relative path to the folder containing your prompt template files (used by `Ask AI with template`).")
       .addText(text =>
         text
           .setPlaceholder("Prompts templates/AI")
@@ -471,7 +471,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Include vault note names in LLM context")
-      .setDesc("When enabled, all vault note names (minus exclusions) are appended to the prompt so the AI can create [[Note Name]] links.")
+      .setDesc("When enabled, all vault note names (minus exclusions) are appended to the prompt so the AI can create `[[Note Name]]` links.")
       .addToggle(toggle =>
         toggle
           .setValue(this.plugin.settings.includeVaultNoteNames)
@@ -531,7 +531,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .addButton(btn =>
           btn
-            .setButtonText("+ Add pattern")
+            .setButtonText("+ add pattern")
             .onClick(async () => {
               this.plugin.settings.vaultNoteNamesExclusions.push("");
               await this.plugin.saveSettings();
@@ -548,7 +548,7 @@ export class AiAssistantSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Result heading")
-      .setDesc("Markdown heading inserted above the AI result (e.g. AI Result). Leave empty for no heading.")
+      .setDesc("Markdown heading inserted above the AI result (e.g. `AI Result`). Leave empty for no heading.")
       .addText(text =>
         text
           .setPlaceholder("AI Result")

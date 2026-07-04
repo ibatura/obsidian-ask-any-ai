@@ -79,7 +79,7 @@ export function buildNoteNamesBlock(app: App, exclusions: string[], includeAlias
         : f.basename;
 
     if (includeAliases) {
-      const rawAliases = app.metadataCache.getFileCache(f)?.frontmatter?.aliases;
+      const rawAliases: unknown = app.metadataCache.getFileCache(f)?.frontmatter?.aliases;
       const aliases = normalizeAliases(rawAliases);
       if (aliases.length > 0) {
         return `${displayName} (aka: ${aliases.join(", ")})`;
