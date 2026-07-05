@@ -1,6 +1,6 @@
 import { LlmConnection } from "../settings";
 import { requestUrl } from "obsidian";
-import { spawn } from "child_process";
+import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 
 export interface LlmRequest {
   systemPrompt: string;
@@ -182,7 +182,7 @@ export class CliClient implements LlmClient {
 
     return new Promise<string>((resolve, reject) => {
       let settled = false;
-      const child = spawn(command, args, {
+      const child: ChildProcessWithoutNullStreams = spawn(command, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
         shell: false,
@@ -191,7 +191,7 @@ export class CliClient implements LlmClient {
       let stdout = "";
       let stderr = "";
 
-      const timer = setTimeout(() => {
+      const timer = window.setTimeout(() => {
         if (settled) return;
         settled = true;
         try { child.kill("SIGKILL"); } catch { /* ignore */ }
@@ -204,14 +204,14 @@ export class CliClient implements LlmClient {
       child.on("error", (err: Error) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         reject(new Error(`Failed to spawn '${command}': ${err.message}`));
       });
 
       child.on("close", (code: number | null) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         if (code !== 0) {
           const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
           reject(new Error(`CLI '${command}' failed: ${detail}`));
@@ -226,7 +226,7 @@ export class CliClient implements LlmClient {
       } catch (err) {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     });

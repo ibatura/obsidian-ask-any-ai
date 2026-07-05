@@ -28,13 +28,13 @@ export function showProgressIndicator(initialMessage: string): ProgressControlle
   elapsedEl.textContent = "0.0s elapsed";
 
   const startTime = Date.now();
-  const intervalId = setInterval(() => {
+  const intervalId = window.setInterval(() => {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     elapsedEl.textContent = `${elapsed}s elapsed`;
   }, 200);
 
   function cleanup(): void {
-    clearInterval(intervalId);
+    window.clearInterval(intervalId);
   }
 
   return {
@@ -46,7 +46,7 @@ export function showProgressIndicator(initialMessage: string): ProgressControlle
     complete(): void {
       this.updateStatus("Done. Result inserted.", 100);
       cleanup();
-      setTimeout(() => notice.hide(), 1000);
+      window.setTimeout(() => notice.hide(), 1000);
     },
     close(): void {
       cleanup();
